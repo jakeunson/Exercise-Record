@@ -1,0 +1,95 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: dark;
+  --bg-color: #000000;
+  --fg-color: #ffffff;
+  --accent-color: #00E676; /* Spring Green for progress */
+  --muted-color: #888888;
+  --border-color: #222222;
+  --card-bg: #111111;
+
+  background-color: var(--bg-color);
+  color: var(--fg-color);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg-color);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  max-width: 500px; /* For desktop testing */
+  background-color: var(--bg-color);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Custom Scrollbar for list */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+/* Typography */
+h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.05rem;
+}
+
+h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+p {
+  color: var(--muted-color);
+  font-size: 0.9rem;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+}
+
+.step-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0 20px 20px;
+  gap: 12px;
+}
+
+/* Z Flip Cover Screen specific adjustments */
+@media (max-aspect-ratio: 1/1) {
+  .step-container {
+    padding: 0 10px 10px;
+    gap: 6px;
+  }
+}
