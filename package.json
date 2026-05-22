@@ -1,14 +1,14 @@
 {
   "name": "---",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "version": "node scripts/update-version.js && npx cap copy"
+    "version": "node scripts/update-version.cjs && npx cap copy"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.4",
