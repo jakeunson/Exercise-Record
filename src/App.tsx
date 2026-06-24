@@ -8,9 +8,15 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { StorageService } from './services/storage';
+
+import { useStorage } from './hooks/useStorage';
+import { useSettingsState } from './hooks/useSettingsState';
+import { useWorkoutState } from './hooks/useWorkoutState';
+import { useHistoryState } from './hooks/useHistoryState';
+import { useInBodyState } from './hooks/useInBodyState';
+
 import ExerciseEditModal from './components/ExerciseEditModal';
 import WorkoutEditModal from './components/WorkoutEditModal';
-
 import CategoryView from './views/CategoryView';
 import SelectExerciseView from './views/SelectExerciseView';
 import RecordView from './views/RecordView';
@@ -19,7 +25,6 @@ import HistoryView from './views/HistoryView';
 import InBodyListView from './views/InBodyListView';
 import InBodyInputView from './views/InBodyInputView';
 import SettingsView from './views/SettingsView';
-
 import ConfirmDeleteModal from './components/modals/ConfirmDeleteModal';
 import AddCustomExerciseModal from './components/modals/AddCustomExerciseModal';
 import InBodyEditModal from './components/modals/InBodyEditModal';
@@ -27,26 +32,53 @@ import './App.css';
 
 type Step = 'category' | 'select' | 'record' | 'summary' | 'history' | 'inbody' | 'inbody_list' | 'settings';
 
-
-
 const App: React.FC = () => {
+  const { isLoaded, error } = useStorage();
+
+  // Internal Step/Navigation State
   const [step, setStep] = useState<Step>('category');
   const [showExitModal, setShowExitModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+
+  // Form States
   const [currentSets, setCurrentSets] = useState<SetRecord[]>([]);
-  
   const [weight, setWeight] = useState(60);
   const [reps, setReps] = useState(10);
   const [tempSubSets, setTempSubSets] = useState<SubSet[]>([]);
-  
   const [distance, setDistance] = useState(5.0);
   const [time, setTime] = useState(30);
   const [calories, setCalories] = useState(100);
 
-  const [prevSession, setPrevSession] = useState<WorkoutSession | null>(null);
-  const [ongoingWorkouts, setOngoingWorkouts] = useState<Record<string, { sets: SetRecord[]; tempSubSets: SubSet[] }>>(() => StorageService.getOngoingWorkouts());
+  // InBody Input States
+  const [ibWeight, setIbWeight] = useState(70);
+  const [ibMuscle, setIbMuscle] = useState(30);
+  const [ibFat, setIbFat] = useState(20);
+
+  // Feedback/UI States
+  const [showSaveToast, setShowSaveToast] = useState(false);
+  const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [deletingSession, setDeletingSession] = useState<{id: string, date: string} | null>(null);
+  const [deletingInBody, setDeletingInBody] = useState<string | null>(null);
   const [editingSession, setEditingSession] = useState<WorkoutSession | null>(null);
+  const [editingInBody, setEditingInBody] = useState<InBodyRecord | null>(null);
+  const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
+  const [showAddExercise, setShowAddExercise] = useState(false);
+  const [newExName, setNewExName] = useState('');
+  
+  // Timer States
+  const [timerActive, setTimerActive] = useState(false);
+  const [timerKey, setTimerKey] = useState(0);
+
+  const wakeLockRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // --- Hooks Initialization (Conditional on isLoaded) ---
+  const settingsState = useSettingsState();
+  const workoutState = useWorkoutState();
+  const historyState = useHistoryState();
+  const inBodyState = useInBodyState();
 
   // Handle Android Back Button
   useEffect(() => {
@@ -72,39 +104,30 @@ const App: React.FC = () => {
     };
   }, [step, showExitModal]);
 
-  // Sync ongoingWorkouts to local storage
-  useEffect(() => {
-    StorageService.saveOngoingWorkouts(ongoingWorkouts);
-  }, [ongoingWorkouts]);
-
   // Synchronize currentSets and tempSubSets back to ongoingWorkouts while recording
   useEffect(() => {
-    if (selectedExercise && step === 'record') {
-      setOngoingWorkouts(prev => {
-        const existing = prev[selectedExercise.id];
-        if (currentSets.length === 0 && tempSubSets.length === 0 && !existing) {
-          return prev;
+    if (selectedExercise && step === 'record' && isLoaded) {
+      const currentOngoing = workoutState.ongoingWorkouts;
+      const existing = currentOngoing[selectedExercise.id];
+      if (currentSets.length === 0 && tempSubSets.length === 0 && !existing) {
+        return;
+      }
+      if (existing && existing.sets === currentSets && existing.tempSubSets === tempSubSets) {
+        return;
+      }
+      workoutState.updateOngoingWorkouts({
+        ...currentOngoing,
+        [selectedExercise.id]: {
+          sets: currentSets,
+          tempSubSets: tempSubSets
         }
-        if (existing && existing.sets === currentSets && existing.tempSubSets === tempSubSets) {
-          return prev;
-        }
-        return {
-          ...prev,
-          [selectedExercise.id]: {
-            sets: currentSets,
-            tempSubSets: tempSubSets
-          }
-        };
       });
     }
-  }, [currentSets, tempSubSets, selectedExercise, step]);
+  }, [currentSets, tempSubSets, selectedExercise, step, isLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // History Filters
-  const [historySessions, setHistorySessions] = useState<WorkoutSession[]>([]);
+  // History Filter
   const [filterMonth, setFilterMonth] = useState(() => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).substring(0, 7));
 
-  const [deletingSession, setDeletingSession] = useState<{id: string, date: string} | null>(null);
-  // Auto-recover empty filterMonth (e.g. from HMR state carryover)
   useEffect(() => {
     if (!filterMonth) {
       setFilterMonth(new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).substring(0, 7));
@@ -113,9 +136,8 @@ const App: React.FC = () => {
 
   // Inject dummy data for June 2026 running if requested
   useEffect(() => {
-    if (!localStorage.getItem('dummy_june_seeded')) {
+    if (isLoaded && !localStorage.getItem('dummy_june_seeded')) {
       const existing = StorageService.getSessions();
-      // Add running data
       existing.push({
         exerciseId: 'treadmill',
         date: '2026-06-15',
@@ -138,77 +160,46 @@ const App: React.FC = () => {
           { distance: 6.0, time: 40, calories: 450, subSets: [], timestamp: Date.now() }
         ]
       });
-      localStorage.setItem('workout_records', JSON.stringify(existing));
+      StorageService.saveSession(existing[existing.length - 3]);
+      StorageService.saveSession(existing[existing.length - 2]);
+      StorageService.saveSession(existing[existing.length - 1]);
       localStorage.setItem('dummy_june_seeded', 'true');
-      setHistorySessions(existing);
-      setWorkoutDates(new Set(existing.map(s => s.date)));
+      historyState.reloadHistory();
     }
-  }, []);
+  }, [isLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // InBody
-  const [inBodyHistory, setInBodyHistory] = useState<InBodyRecord[]>([]);
-  const [ibWeight, setIbWeight] = useState(70);
-  const [ibMuscle, setIbMuscle] = useState(30);
-  const [ibFat, setIbFat] = useState(20);
-  const [deletingInBody, setDeletingInBody] = useState<string | null>(null);
-  const [editingInBody, setEditingInBody] = useState<InBodyRecord | null>(null);
+  // Refresh Views when navigating
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (step === 'history') historyState.reloadHistory();
+    if (step === 'inbody_list') inBodyState.reloadInBody();
+    if (step === 'category') historyState.reloadHistory(); // Refresh workoutDates
+  }, [step, isLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Feedback
-  const [showSaveToast, setShowSaveToast] = useState(false);
-  const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  // Theme
+  useEffect(() => {
+    if (isLoaded) {
+      document.documentElement.style.setProperty('--accent-color', settingsState.accentColor);
+    }
+  }, [settingsState.accentColor, isLoaded]);
 
-  // Wake Lock
-  const wakeLockRef = useRef<any>(null);
+  const applyTheme = (color: string) => {
+    settingsState.updateAccentColor(color);
+    document.documentElement.style.setProperty('--accent-color', color);
+  };
 
-  // ─── Feature 1: Rest Timer ───────────────────────────────────────────────
-  const [timerActive, setTimerActive] = useState(false);
-  const [timerKey, setTimerKey] = useState(0);
-  const [timerDuration, setTimerDuration] = useState<number>(() => StorageService.getTimerDuration());
-
+  // Timer
   const startTimer = useCallback(() => {
-    if (timerDuration === 0) return;
+    if (settingsState.timerDuration === 0) return;
     setTimerActive(true);
     setTimerKey(k => k + 1);
-  }, [timerDuration]);
+  }, [settingsState.timerDuration]);
 
   const stopTimer = useCallback(() => {
     setTimerActive(false);
   }, []);
 
-  // ─── Feature 2: Exercise Customization ───────────────────────────────────
-  const [customExercises, setCustomExercises] = useState<CustomExercise[]>(() => StorageService.getCustomExercises());
-  const [exerciseSettings, setExerciseSettings] = useState<ExerciseSettings[]>(() => StorageService.getExerciseSettings());
-  const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
-  const [showAddExercise, setShowAddExercise] = useState(false);
-  const [newExName, setNewExName] = useState('');
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const refreshExerciseSettings = useCallback(() => {
-    setExerciseSettings(StorageService.getExerciseSettings());
-    setCustomExercises(StorageService.getCustomExercises());
-  }, []);
-
-  const getExSetting = useCallback((exerciseId: string): ExerciseSettings => {
-    return exerciseSettings.find(s => s.exerciseId === exerciseId) ?? { exerciseId, showName: true };
-  }, [exerciseSettings]);
-
-  // ─── Feature 3: Calendar & Stats ─────────────────────────────────────────
-  const [workoutDates, setWorkoutDates] = useState<Set<string>>(() => StorageService.getWorkoutDates());
-
-  // ─── Feature 4: Theme ────────────────────────────────────────────────────
-  const [accentColor, setAccentColor] = useState<string>(() => StorageService.getTheme());
-
-  useEffect(() => {
-    document.documentElement.style.setProperty('--accent-color', accentColor);
-  }, [accentColor]);
-
-  const applyTheme = (color: string) => {
-    setAccentColor(color);
-    StorageService.saveTheme(color);
-    document.documentElement.style.setProperty('--accent-color', color);
-  };
-
-  // ─── Wake Lock ───────────────────────────────────────────────────────────
+  // Wake Lock
   const requestWakeLock = async () => {
     try {
       if ('wakeLock' in navigator) {
@@ -231,57 +222,32 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const weightOptions = Array.from({ length: 400 }, (_, i) => i * 0.5 + 5);
-  const repOptions = Array.from({ length: 50 }, (_, i) => i + 1);
-  const distanceOptions = Array.from({ length: 200 }, (_, i) => Math.round((i * 0.1 + 0.1) * 10) / 10);
-  const timeOptions = Array.from({ length: 300 }, (_, i) => i);
-  const calorieOptions = Array.from({ length: 150 }, (_, i) => i * 10);
-
-  const ibWeightOptions = Array.from({ length: 1200 }, (_, i) => Math.round((i * 0.1 + 30) * 10) / 10);
-  const ibMuscleOptions = Array.from({ length: 800 }, (_, i) => Math.round((i * 0.1 + 10) * 10) / 10);
-  const ibFatOptions = Array.from({ length: 500 }, (_, i) => Math.round((i * 0.1 + 1) * 10) / 10);
-
-  useEffect(() => {
-    if (step === 'history') {
-      const s = StorageService.getSessions();
-      setHistorySessions(s);
-    }
-    if (step === 'inbody_list') setInBodyHistory(StorageService.getInBodyHistory());
-    if (step === 'category') setWorkoutDates(StorageService.getWorkoutDates());
-  }, [step]);
-
+  // Memos
   const filteredHistory = useMemo(() => {
-    return historySessions
+    return historyState.historySessions
       .filter(s => !filterMonth || s.date.startsWith(filterMonth))
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [historySessions, filterMonth]);
+  }, [historyState.historySessions, filterMonth]);
 
-  // All exercises = DEFAULT + custom, merged
   const allExercises = useMemo(() => {
-    return [...DEFAULT_EXERCISES, ...customExercises] as Exercise[];
-  }, [customExercises]);
+    return [...DEFAULT_EXERCISES, ...workoutState.customExercises] as Exercise[];
+  }, [workoutState.customExercises]);
 
-  // Calculate active categories that have ongoing exercises with saved sets
   const activeCategories = useMemo(() => {
     const activeCats = new Set<Category>();
-    Object.entries(ongoingWorkouts).forEach(([exId, state]) => {
+    Object.entries(workoutState.ongoingWorkouts).forEach(([exId, state]) => {
       if (state.sets.length > 0) {
         const ex = allExercises.find(e => e.id === exId);
-        if (ex) {
-          activeCats.add(ex.category);
-        }
+        if (ex) activeCats.add(ex.category);
       }
     });
     return activeCats;
-  }, [ongoingWorkouts, allExercises]);
+  }, [workoutState.ongoingWorkouts, allExercises]);
 
   const filteredExercises = useMemo(() => {
     if (!selectedCategory) return [];
     const base = allExercises.filter(ex => ex.category === selectedCategory);
-    const sessions = StorageService.getSessions();
-    const usedIds = new Set(sessions.map(s => s.exerciseId));
+    const usedIds = new Set(historyState.historySessions.map(s => s.exerciseId));
     
     return [...base].sort((a, b) => {
       const aUsed = usedIds.has(a.id) ? 1 : 0;
@@ -289,15 +255,21 @@ const App: React.FC = () => {
       if (aUsed !== bUsed) return bUsed - aUsed;
       return a.name.localeCompare(b.name);
     });
-  }, [selectedCategory, allExercises]);
+  }, [selectedCategory, allExercises, historyState.historySessions]);
+
+  const getExSetting = useCallback((exerciseId: string): ExerciseSettings => {
+    return settingsState.exerciseSettings.find(s => s.exerciseId === exerciseId) ?? { exerciseId, showName: true };
+  }, [settingsState.exerciseSettings]);
 
   const selectCategory = (cat: Category) => {
     setSelectedCategory(cat);
     setStep('select');
   };
 
+  const [prevSession, setPrevSession] = useState<WorkoutSession | null>(null);
+
   const startWorkout = (exercise: Exercise) => {
-    const ongoing = ongoingWorkouts[exercise.id];
+    const ongoing = workoutState.ongoingWorkouts[exercise.id];
     
     setSelectedExercise(exercise);
     setTimerActive(false);
@@ -307,20 +279,12 @@ const App: React.FC = () => {
     if (!ongoing) {
       setCurrentSets([]);
       setTempSubSets([]);
-      
-      // Reset input states to clean defaults for the new exercise
-      setWeight(60);
-      setReps(10);
-      setDistance(5.0);
-      setTime(30);
-      setCalories(100);
-      
+      setWeight(60); setReps(10); setDistance(5.0); setTime(30); setCalories(100);
       updatePrevSet(exercise.id, 0);
     } else {
       setCurrentSets(ongoing.sets);
       setTempSubSets(ongoing.tempSubSets);
       
-      // Initialize inputs to last saved set values today if any exist
       if (ongoing.sets.length > 0) {
         const lastSet = ongoing.sets[ongoing.sets.length - 1];
         if (exercise.category === 'cardio') {
@@ -333,20 +297,10 @@ const App: React.FC = () => {
           setReps(lastSub.reps);
         }
       } else {
-        setWeight(60);
-        setReps(10);
-        setDistance(5.0);
-        setTime(30);
-        setCalories(100);
+        setWeight(60); setReps(10); setDistance(5.0); setTime(30); setCalories(100);
       }
-      
       updatePrevSet(exercise.id, ongoing.sets.length);
     }
-  };
-
-  const deleteWorkout = (exerciseId: string, date: string) => {
-    StorageService.deleteSession(exerciseId, date);
-    setHistorySessions(StorageService.getSessions());
   };
 
   const updatePrevSet = (exerciseId: string, setIndex: number) => {
@@ -357,8 +311,8 @@ const App: React.FC = () => {
         setReps(prev.subSets[0].reps);
       }
       if (prev.distance) setDistance(prev.distance);
-        if (prev.time) setTime(prev.time);
-        if (prev.calories) setCalories(prev.calories);
+      if (prev.time) setTime(prev.time);
+      if (prev.calories) setCalories(prev.calories);
     }
   };
 
@@ -379,13 +333,10 @@ const App: React.FC = () => {
     
     setShowSaveToast(true);
     setTimeout(() => setShowSaveToast(false), 1000);
-
-    // Start rest timer
     startTimer();
   };
 
   const finishWorkout = () => {
-    // Stop timer if running
     stopTimer();
     if (selectedExercise && (currentSets.length > 0 || tempSubSets.length > 0)) {
       const finalSets = [...currentSets];
@@ -395,7 +346,7 @@ const App: React.FC = () => {
           : { subSets: tempSubSets.length > 0 ? tempSubSets : [{ weight, reps }], timestamp: Date.now() };
         finalSets.push(pendingSet);
       }
-      StorageService.saveSession({
+      historyState.saveSession({
         exerciseId: selectedExercise.id,
         date: new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }),
         sets: finalSets,
@@ -404,29 +355,22 @@ const App: React.FC = () => {
     }
 
     if (selectedExercise) {
-      setOngoingWorkouts(prev => {
-        const copy = { ...prev };
-        delete copy[selectedExercise.id];
-        return copy;
-      });
+      const copy = { ...workoutState.ongoingWorkouts };
+      delete copy[selectedExercise.id];
+      workoutState.updateOngoingWorkouts(copy);
     }
 
     setStep('summary');
   };
 
   const saveInBody = () => {
-    StorageService.saveInBody({
+    inBodyState.saveInBody({
       date: new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }),
       weight: ibWeight,
       skeletalMuscleMass: ibMuscle,
       bodyFatPercentage: ibFat
     });
     setStep('inbody_list');
-  };
-
-  const deleteInBody = (date: string) => {
-    StorageService.deleteInBody(date);
-    setInBodyHistory(StorageService.getInBodyHistory());
   };
 
   const handleExport = async () => {
@@ -467,10 +411,16 @@ const App: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = StorageService.importData(event.target?.result as string);
+    reader.onload = async (event) => {
+      const result = await StorageService.importData(event.target?.result as string);
       setImportStatus(result ? 'success' : 'error');
-      if (result) setTimeout(() => setStep('category'), 1500);
+      if (result) {
+        setTimeout(() => {
+          historyState.reloadHistory();
+          inBodyState.reloadInBody();
+          setStep('category');
+        }, 1500);
+      }
     };
     reader.readAsText(file);
   };
@@ -483,10 +433,9 @@ const App: React.FC = () => {
     setTempSubSets([]);
     setImportStatus('idle');
     setTimerActive(false);
-    setWorkoutDates(StorageService.getWorkoutDates());
+    historyState.reloadHistory();
   };
 
-  // Long press handlers for exercise editing
   const handleLongPressStart = (exercise: Exercise) => {
     longPressTimer.current = setTimeout(() => {
       if (navigator.vibrate) navigator.vibrate(50);
@@ -498,7 +447,6 @@ const App: React.FC = () => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
   };
 
-  // Add custom exercise
   const handleAddCustomExercise = () => {
     if (!newExName.trim() || !selectedCategory) return;
     const newEx: CustomExercise = {
@@ -507,11 +455,31 @@ const App: React.FC = () => {
       category: selectedCategory,
       isCustom: true,
     };
-    StorageService.saveCustomExercise(newEx);
-    setCustomExercises(StorageService.getCustomExercises());
+    workoutState.saveCustomExercise(newEx);
     setNewExName('');
     setShowAddExercise(false);
   };
+
+  const weightOptions = Array.from({ length: 400 }, (_, i) => i * 0.5 + 5);
+  const repOptions = Array.from({ length: 50 }, (_, i) => i + 1);
+  const distanceOptions = Array.from({ length: 200 }, (_, i) => Math.round((i * 0.1 + 0.1) * 10) / 10);
+  const timeOptions = Array.from({ length: 300 }, (_, i) => i);
+  const calorieOptions = Array.from({ length: 150 }, (_, i) => i * 10);
+
+  const ibWeightOptions = Array.from({ length: 1200 }, (_, i) => Math.round((i * 0.1 + 30) * 10) / 10);
+  const ibMuscleOptions = Array.from({ length: 800 }, (_, i) => Math.round((i * 0.1 + 10) * 10) / 10);
+  const ibFatOptions = Array.from({ length: 500 }, (_, i) => Math.round((i * 0.1 + 1) * 10) / 10);
+
+  // Loading Screen
+  if (!isLoaded) {
+    return (
+      <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-primary)' }}>
+        <div style={{ color: 'var(--text-secondary)', fontSize: '1.2rem' }}>
+          {error ? '데이터를 불러오지 못했습니다.' : '데이터를 불러오는 중...'}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
@@ -521,18 +489,15 @@ const App: React.FC = () => {
             activeCategories={activeCategories}
             selectCategory={selectCategory}
             setStep={setStep}
-            workoutDates={workoutDates}
+            workoutDates={historyState.workoutDates}
           />
         )}
         {step === 'settings' && (
           <SettingsView
-            accentColor={accentColor}
+            accentColor={settingsState.accentColor}
             applyTheme={applyTheme}
-            timerDuration={timerDuration}
-            setTimerDuration={(val) => {
-              setTimerDuration(val);
-              StorageService.saveTimerDuration(val);
-            }}
+            timerDuration={settingsState.timerDuration}
+            setTimerDuration={settingsState.updateTimerDuration}
             handleExport={handleExport}
             handleImport={handleImport}
             importStatus={importStatus}
@@ -542,7 +507,7 @@ const App: React.FC = () => {
         )}
         {step === 'inbody_list' && (
           <InBodyListView
-            inBodyHistory={inBodyHistory}
+            inBodyHistory={inBodyState.inBodyHistory}
             setEditingInBody={setEditingInBody}
             setDeletingInBody={setDeletingInBody}
             setStep={setStep}
@@ -558,7 +523,7 @@ const App: React.FC = () => {
         )}
         {step === 'history' && (
           <HistoryView
-            historySessions={historySessions}
+            historySessions={historyState.historySessions}
             allExercises={allExercises}
             filterMonth={filterMonth} setFilterMonth={setFilterMonth}
             filteredHistory={filteredHistory}
@@ -571,7 +536,7 @@ const App: React.FC = () => {
           <SelectExerciseView
             selectedCategory={selectedCategory}
             filteredExercises={filteredExercises}
-            ongoingWorkouts={ongoingWorkouts}
+            ongoingWorkouts={workoutState.ongoingWorkouts}
             getExSetting={getExSetting}
             startWorkout={startWorkout}
             handleLongPressStart={handleLongPressStart}
@@ -589,7 +554,7 @@ const App: React.FC = () => {
             distance={distance} time={time} weight={weight} reps={reps} calories={calories}
             setDistance={setDistance} setTime={setTime} setWeight={setWeight} setReps={setReps} setCalories={setCalories}
             addSubSet={addSubSet} saveSet={saveSet} finishWorkout={finishWorkout}
-            timerActive={timerActive} timerKey={timerKey} timerDuration={timerDuration} stopTimer={stopTimer}
+            timerActive={timerActive} timerKey={timerKey} timerDuration={settingsState.timerDuration} stopTimer={stopTimer}
             showSaveToast={showSaveToast}
             setStep={setStep}
             distanceOptions={distanceOptions} timeOptions={timeOptions} weightOptions={weightOptions} repOptions={repOptions} calorieOptions={calorieOptions}
@@ -610,8 +575,8 @@ const App: React.FC = () => {
           <ConfirmDeleteModal
             onCancel={() => { setDeletingSession(null); setDeletingInBody(null); }}
             onConfirm={() => {
-              if (deletingSession) deleteWorkout(deletingSession.id, deletingSession.date);
-              if (deletingInBody) deleteInBody(deletingInBody);
+              if (deletingSession) historyState.deleteSession(deletingSession.id, deletingSession.date);
+              if (deletingInBody) inBodyState.deleteInBody(deletingInBody);
               setDeletingSession(null);
               setDeletingInBody(null);
             }}
@@ -625,10 +590,10 @@ const App: React.FC = () => {
           <ExerciseEditModal
             exercise={editingExercise}
             onClose={() => setEditingExercise(null)}
-            onSaved={refreshExerciseSettings}
+            onSaved={settingsState.reloadSettings}
             onDeleted={() => {
-              setCustomExercises(StorageService.getCustomExercises());
-              setExerciseSettings(StorageService.getExerciseSettings());
+              workoutState.reloadCustomExercises();
+              settingsState.reloadSettings();
             }}
           />
         )}
@@ -642,8 +607,7 @@ const App: React.FC = () => {
             allExercises={allExercises}
             onClose={() => setEditingSession(null)}
             onSaved={() => {
-              setHistorySessions(StorageService.getSessions());
-              setWorkoutDates(StorageService.getWorkoutDates());
+              historyState.reloadHistory();
             }}
           />
         )}
@@ -656,7 +620,7 @@ const App: React.FC = () => {
             record={editingInBody}
             onClose={() => setEditingInBody(null)}
             onSaved={() => {
-              setInBodyHistory(StorageService.getInBodyHistory());
+              inBodyState.reloadInBody();
             }}
           />
         )}

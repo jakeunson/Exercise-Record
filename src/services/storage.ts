@@ -1,209 +1,198 @@
+import localforage from 'localforage';
 import type { WorkoutSession, SetRecord, InBodyRecord, ExerciseSettings, CustomExercise, SubSet } from '../types';
 
-const STORAGE_KEY = 'workout_records';
-const EXERCISE_SETTINGS_KEY = 'exercise_settings';
-const CUSTOM_EXERCISES_KEY = 'custom_exercises';
-const TIMER_DURATION_KEY = 'timer_duration';
-const THEME_KEY = 'accent_theme';
+const KEYS = {
+  SESSIONS: 'workout_records',
+  INBODY: 'inbody_history',
+  SETTINGS: 'exercise_settings',
+  CUSTOM_EXERCISES: 'custom_exercises',
+  TIMER: 'timer_duration',
+  THEME: 'accent_theme',
+  ONGOING: 'ongoing_workouts_state'
+};
+
+// Hybrid Cache
+const cache = {
+  sessions: [] as WorkoutSession[],
+  inBody: [] as InBodyRecord[],
+  settings: [] as ExerciseSettings[],
+  customExercises: [] as CustomExercise[],
+  timer: 60,
+  theme: '#00E676',
+  ongoing: {} as Record<string, { sets: SetRecord[]; tempSubSets: SubSet[] }>
+};
 
 export const StorageService = {
-  getSessions: (): WorkoutSession[] => {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  },
+  isInitialized: false,
 
-  saveSession: (session: WorkoutSession) => {
-    const sessions = StorageService.getSessions();
-    const existingIndex = sessions.findIndex(
-      (s) => s.exerciseId === session.exerciseId && s.date === session.date
-    );
+  init: async () => {
+    if (StorageService.isInitialized) return;
 
-    if (existingIndex > -1) {
-      sessions[existingIndex] = session;
-    } else {
-      sessions.push(session);
+    // Optional Migration from localStorage
+    for (const key of Object.values(KEYS)) {
+      const old = localStorage.getItem(key);
+      if (old !== null) {
+        let parsed;
+        try {
+          parsed = JSON.parse(old);
+        } catch {
+          parsed = old; // strings like timer or theme
+        }
+        await localforage.setItem(key, parsed);
+        localStorage.removeItem(key);
+      }
     }
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    // Load into cache
+    const loadSafe = async <T>(key: string, defaultVal: T): Promise<T> => {
+      try {
+        const val = await localforage.getItem<T>(key);
+        return val !== null ? val : defaultVal;
+      } catch (e) {
+        console.error(`Failed to load ${key}`, e);
+        return defaultVal;
+      }
+    };
+
+    cache.sessions = await loadSafe(KEYS.SESSIONS, []);
+    cache.inBody = await loadSafe(KEYS.INBODY, []);
+    cache.settings = await loadSafe(KEYS.SETTINGS, []);
+    cache.customExercises = await loadSafe(KEYS.CUSTOM_EXERCISES, []);
+    
+    const savedTimer = await loadSafe<string | number>(KEYS.TIMER, 60);
+    cache.timer = typeof savedTimer === 'string' ? parseInt(savedTimer, 10) : savedTimer;
+    
+    cache.theme = await loadSafe(KEYS.THEME, '#00E676');
+    cache.ongoing = await loadSafe(KEYS.ONGOING, {});
+
+    StorageService.isInitialized = true;
   },
 
-  deleteSession: (exerciseId: string, date: string) => {
-    const sessions = StorageService.getSessions();
-    const filtered = sessions.filter(
-      (s) => !(s.exerciseId === exerciseId && s.date === date)
-    );
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-  },
-
-  // InBody
-  saveInBody: (record: InBodyRecord) => {
-    const history = StorageService.getInBodyHistory();
-    const updated = [record, ...history.filter(r => r.date !== record.date)];
-    localStorage.setItem('inbody_history', JSON.stringify(updated.sort((a, b) => b.date.localeCompare(a.date))));
-  },
-
-  updateInBody: (oldDate: string, record: InBodyRecord) => {
-    let history = StorageService.getInBodyHistory();
-    history = history.filter(r => r.date !== oldDate);
-    // If the new date already exists in history, we overwrite it as well
-    history = history.filter(r => r.date !== record.date);
-    const updated = [record, ...history];
-    localStorage.setItem('inbody_history', JSON.stringify(updated.sort((a, b) => b.date.localeCompare(a.date))));
-  },
-
-  getInBodyHistory: (): InBodyRecord[] => {
-    const saved = localStorage.getItem('inbody_history');
-    return saved ? JSON.parse(saved) : [];
-  },
-
-  deleteInBody: (date: string) => {
-    const history = StorageService.getInBodyHistory();
-    const filtered = history.filter(r => r.date !== date);
-    localStorage.setItem('inbody_history', JSON.stringify(filtered));
-  },
+  // Getters (Synchronous from Cache)
+  getSessions: () => cache.sessions,
+  getInBodyHistory: () => cache.inBody,
+  getTimerDuration: () => cache.timer,
+  getTheme: () => cache.theme,
+  getExerciseSettings: () => cache.settings,
+  getExerciseSetting: (exerciseId: string) => cache.settings.find(s => s.exerciseId === exerciseId) ?? { exerciseId, showName: true },
+  getCustomExercises: () => cache.customExercises,
+  getOngoingWorkouts: () => cache.ongoing,
+  getWorkoutDates: () => new Set(cache.sessions.map(s => s.date)),
 
   getPreviousSetRecord: (exerciseId: string, setIndex: number): SetRecord | null => {
-    const sessions = StorageService.getSessions();
     const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
-
-    const pastSessions = sessions
-      .filter((s) => s.exerciseId === exerciseId && s.date < today)
+    const pastSessions = cache.sessions
+      .filter(s => s.exerciseId === exerciseId && s.date < today)
       .sort((a, b) => b.date.localeCompare(a.date));
-
-    if (pastSessions.length > 0) {
-      const lastSession = pastSessions[0];
-      return lastSession.sets[setIndex] || null;
-    }
-
-    return null;
+    return pastSessions.length > 0 ? (pastSessions[0].sets[setIndex] || null) : null;
   },
 
   getLatestSession: (exerciseId: string): WorkoutSession | null => {
-    const sessions = StorageService.getSessions();
     const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
-
-    const pastSessions = sessions
-      .filter((s) => s.exerciseId === exerciseId && s.date < today)
+    const pastSessions = cache.sessions
+      .filter(s => s.exerciseId === exerciseId && s.date < today)
       .sort((a, b) => b.date.localeCompare(a.date));
-
     return pastSessions.length > 0 ? pastSessions[0] : null;
   },
 
-  updateSession: (oldExerciseId: string, oldDate: string, updated: WorkoutSession) => {
-    let sessions = StorageService.getSessions();
-    // Remove the old one first
-    sessions = sessions.filter(
-      (s) => !(s.exerciseId === oldExerciseId && s.date === oldDate)
-    );
-    // Check if there is an existing session with the new exerciseId and date
-    const existingIndex = sessions.findIndex(
-      (s) => s.exerciseId === updated.exerciseId && s.date === updated.date
-    );
-    if (existingIndex > -1) {
-      sessions[existingIndex] = updated;
-    } else {
-      sessions.push(updated);
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  // Setters (Synchronous Cache + Asynchronous DB)
+  saveSession: (session: WorkoutSession) => {
+    const existingIndex = cache.sessions.findIndex(s => s.exerciseId === session.exerciseId && s.date === session.date);
+    if (existingIndex > -1) cache.sessions[existingIndex] = session;
+    else cache.sessions.push(session);
+    localforage.setItem(KEYS.SESSIONS, cache.sessions);
   },
 
-  // Export/Import
+  updateSession: (oldExerciseId: string, oldDate: string, updated: WorkoutSession) => {
+    cache.sessions = cache.sessions.filter(s => !(s.exerciseId === oldExerciseId && s.date === oldDate));
+    const existingIndex = cache.sessions.findIndex(s => s.exerciseId === updated.exerciseId && s.date === updated.date);
+    if (existingIndex > -1) cache.sessions[existingIndex] = updated;
+    else cache.sessions.push(updated);
+    localforage.setItem(KEYS.SESSIONS, cache.sessions);
+  },
+
+  deleteSession: (exerciseId: string, date: string) => {
+    cache.sessions = cache.sessions.filter(s => !(s.exerciseId === exerciseId && s.date === date));
+    localforage.setItem(KEYS.SESSIONS, cache.sessions);
+  },
+
+  saveInBody: (record: InBodyRecord) => {
+    const updated = [record, ...cache.inBody.filter(r => r.date !== record.date)];
+    cache.inBody = updated.sort((a, b) => b.date.localeCompare(a.date));
+    localforage.setItem(KEYS.INBODY, cache.inBody);
+  },
+
+  updateInBody: (oldDate: string, record: InBodyRecord) => {
+    let history = cache.inBody.filter(r => r.date !== oldDate && r.date !== record.date);
+    cache.inBody = [record, ...history].sort((a, b) => b.date.localeCompare(a.date));
+    localforage.setItem(KEYS.INBODY, cache.inBody);
+  },
+
+  deleteInBody: (date: string) => {
+    cache.inBody = cache.inBody.filter(r => r.date !== date);
+    localforage.setItem(KEYS.INBODY, cache.inBody);
+  },
+
+  saveTimerDuration: (seconds: number) => {
+    cache.timer = seconds;
+    localforage.setItem(KEYS.TIMER, cache.timer);
+  },
+
+  saveTheme: (color: string) => {
+    cache.theme = color;
+    localforage.setItem(KEYS.THEME, cache.theme);
+  },
+
+  saveExerciseSetting: (setting: ExerciseSettings) => {
+    const idx = cache.settings.findIndex(s => s.exerciseId === setting.exerciseId);
+    if (idx > -1) cache.settings[idx] = setting;
+    else cache.settings.push(setting);
+    localforage.setItem(KEYS.SETTINGS, cache.settings);
+  },
+
+  saveCustomExercise: (exercise: CustomExercise) => {
+    const idx = cache.customExercises.findIndex(e => e.id === exercise.id);
+    if (idx > -1) cache.customExercises[idx] = exercise;
+    else cache.customExercises.push(exercise);
+    localforage.setItem(KEYS.CUSTOM_EXERCISES, cache.customExercises);
+  },
+
+  deleteCustomExercise: (exerciseId: string) => {
+    cache.customExercises = cache.customExercises.filter(e => e.id !== exerciseId);
+    localforage.setItem(KEYS.CUSTOM_EXERCISES, cache.customExercises);
+    cache.settings = cache.settings.filter(s => s.exerciseId !== exerciseId);
+    localforage.setItem(KEYS.SETTINGS, cache.settings);
+  },
+
+  saveOngoingWorkouts: (state: Record<string, { sets: SetRecord[]; tempSubSets: SubSet[] }>) => {
+    cache.ongoing = state;
+    localforage.setItem(KEYS.ONGOING, cache.ongoing);
+  },
+
   exportData: () => {
-    const data = {
-      workout_records: localStorage.getItem(STORAGE_KEY),
-      inbody_history: localStorage.getItem('inbody_history'),
+    return JSON.stringify({
+      workout_records: JSON.stringify(cache.sessions),
+      inbody_history: JSON.stringify(cache.inBody),
       version: '1.0.0',
       timestamp: Date.now()
-    };
-    return JSON.stringify(data);
+    });
   },
 
-  importData: (jsonString: string) => {
+  importData: async (jsonString: string) => {
     try {
       const data = JSON.parse(jsonString);
-      if (data.workout_records) localStorage.setItem(STORAGE_KEY, data.workout_records);
-      if (data.inbody_history) localStorage.setItem('inbody_history', data.inbody_history);
+      if (data.workout_records) {
+        cache.sessions = JSON.parse(data.workout_records);
+        await localforage.setItem(KEYS.SESSIONS, cache.sessions);
+      }
+      if (data.inbody_history) {
+        cache.inBody = JSON.parse(data.inbody_history);
+        await localforage.setItem(KEYS.INBODY, cache.inBody);
+      }
       return true;
     } catch (e) {
       console.error('Import failed', e);
       return false;
     }
-  },
-
-  // Timer Duration
-  getTimerDuration: (): number => {
-    const saved = localStorage.getItem(TIMER_DURATION_KEY);
-    return saved !== null ? parseInt(saved, 10) : 60;
-  },
-
-  saveTimerDuration: (seconds: number) => {
-    localStorage.setItem(TIMER_DURATION_KEY, String(seconds));
-  },
-
-  // Theme
-  getTheme: (): string => {
-    return localStorage.getItem(THEME_KEY) || '#00E676';
-  },
-
-  saveTheme: (color: string) => {
-    localStorage.setItem(THEME_KEY, color);
-  },
-
-  // Exercise Settings (image + name visibility for all exercises)
-  getExerciseSettings: (): ExerciseSettings[] => {
-    const saved = localStorage.getItem(EXERCISE_SETTINGS_KEY);
-    return saved ? JSON.parse(saved) : [];
-  },
-
-  saveExerciseSetting: (setting: ExerciseSettings) => {
-    const all = StorageService.getExerciseSettings();
-    const idx = all.findIndex(s => s.exerciseId === setting.exerciseId);
-    if (idx > -1) all[idx] = setting;
-    else all.push(setting);
-    localStorage.setItem(EXERCISE_SETTINGS_KEY, JSON.stringify(all));
-  },
-
-  getExerciseSetting: (exerciseId: string): ExerciseSettings => {
-    const all = StorageService.getExerciseSettings();
-    return all.find(s => s.exerciseId === exerciseId) ?? { exerciseId, showName: true };
-  },
-
-  // Custom Exercises
-  getCustomExercises: (): CustomExercise[] => {
-    const saved = localStorage.getItem(CUSTOM_EXERCISES_KEY);
-    return saved ? JSON.parse(saved) : [];
-  },
-
-  saveCustomExercise: (exercise: CustomExercise) => {
-    const all = StorageService.getCustomExercises();
-    const idx = all.findIndex(e => e.id === exercise.id);
-    if (idx > -1) all[idx] = exercise;
-    else all.push(exercise);
-    localStorage.setItem(CUSTOM_EXERCISES_KEY, JSON.stringify(all));
-  },
-
-  deleteCustomExercise: (exerciseId: string) => {
-    const all = StorageService.getCustomExercises();
-    const filtered = all.filter(e => e.id !== exerciseId);
-    localStorage.setItem(CUSTOM_EXERCISES_KEY, JSON.stringify(filtered));
-    // Also remove its settings
-    const settings = StorageService.getExerciseSettings().filter(s => s.exerciseId !== exerciseId);
-    localStorage.setItem(EXERCISE_SETTINGS_KEY, JSON.stringify(settings));
-  },
-
-  // Workout dates for calendar
-  getWorkoutDates: (): Set<string> => {
-    const sessions = StorageService.getSessions();
-    return new Set(sessions.map(s => s.date));
-  },
-
-  // Ongoing Workouts
-  getOngoingWorkouts: (): Record<string, { sets: SetRecord[]; tempSubSets: SubSet[] }> => {
-    const saved = localStorage.getItem('ongoing_workouts_state');
-    return saved ? JSON.parse(saved) : {};
-  },
-
-  saveOngoingWorkouts: (state: Record<string, { sets: SetRecord[]; tempSubSets: SubSet[] }>) => {
-    localStorage.setItem('ongoing_workouts_state', JSON.stringify(state));
-  },
+  }
 };
