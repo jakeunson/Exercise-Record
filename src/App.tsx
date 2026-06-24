@@ -4,6 +4,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { DEFAULT_EXERCISES } from './types';
 import type { Category, WorkoutSession, SetRecord, SubSet, Exercise, InBodyRecord } from './types';
 import type { CustomExercise, ExerciseSettings } from './types';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 import { StorageService } from './services/storage';
 import ExerciseEditModal from './components/ExerciseEditModal';
 import WorkoutEditModal from './components/WorkoutEditModal';
@@ -427,15 +430,38 @@ const App: React.FC = () => {
     setInBodyHistory(StorageService.getInBodyHistory());
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const json = StorageService.exportData();
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `workout_backup_${new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+    const fileName = `workout_backup_${new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })}.json`;
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const result = await Filesystem.writeFile({
+          path: fileName,
+          data: json,
+          directory: Directory.Cache,
+          encoding: Encoding.UTF8
+        });
+        
+        await Share.share({
+          title: '백업 파일 공유',
+          text: '운동 기록 백업 파일입니다.',
+          url: result.uri,
+          dialogTitle: '백업 파일 저장 및 공유'
+        });
+      } catch (e) {
+        console.error('Backup share error:', e);
+        alert('백업 파일 생성 중 오류가 발생했습니다.');
+      }
+    } else {
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
