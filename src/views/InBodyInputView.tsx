@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Camera } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import SwipePicker from '../components/SwipePicker';
 
 interface InBodyInputViewProps {

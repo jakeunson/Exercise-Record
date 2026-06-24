@@ -99,7 +99,7 @@ const App: React.FC = () => {
   // History Filters
   const [historySessions, setHistorySessions] = useState<WorkoutSession[]>([]);
   const [filterMonth, setFilterMonth] = useState(() => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).substring(0, 7));
-  const [filterExerciseId, setFilterExerciseId] = useState<string>('');
+  const [filterExerciseId] = useState<string>('all');
   const [deletingSession, setDeletingSession] = useState<{id: string, date: string} | null>(null);
   // Auto-recover empty filterMonth (e.g. from HMR state carryover)
   useEffect(() => {
@@ -536,7 +536,6 @@ const App: React.FC = () => {
             historySessions={historySessions}
             allExercises={allExercises}
             filterMonth={filterMonth} setFilterMonth={setFilterMonth}
-            filterExerciseId={filterExerciseId} setFilterExerciseId={setFilterExerciseId}
             filteredHistory={filteredHistory}
             setEditingSession={setEditingSession}
             setDeletingSession={setDeletingSession}

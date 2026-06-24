@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Calendar, Filter, Trash2, Edit2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Calendar, Trash2, Edit2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Exercise, WorkoutSession } from '../types';
 import StatsCard from '../components/StatsCard';
 
@@ -9,8 +9,6 @@ interface HistoryViewProps {
   allExercises: Exercise[];
   filterMonth: string;
   setFilterMonth: (val: string) => void;
-  filterExerciseId: string;
-  setFilterExerciseId: (val: string) => void;
   filteredHistory: WorkoutSession[];
   setEditingSession: (session: WorkoutSession) => void;
   setDeletingSession: (info: { id: string, date: string }) => void;
@@ -90,7 +88,6 @@ const HistoryView: React.FC<HistoryViewProps> = ({
   historySessions,
   allExercises,
   filterMonth, setFilterMonth,
-  filterExerciseId, setFilterExerciseId,
   filteredHistory,
   setEditingSession,
   setDeletingSession,
