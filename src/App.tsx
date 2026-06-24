@@ -102,7 +102,7 @@ const App: React.FC = () => {
   // History Filters
   const [historySessions, setHistorySessions] = useState<WorkoutSession[]>([]);
   const [filterMonth, setFilterMonth] = useState(() => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).substring(0, 7));
-  const [filterExerciseId] = useState<string>('all');
+
   const [deletingSession, setDeletingSession] = useState<{id: string, date: string} | null>(null);
   // Auto-recover empty filterMonth (e.g. from HMR state carryover)
   useEffect(() => {
@@ -255,9 +255,8 @@ const App: React.FC = () => {
   const filteredHistory = useMemo(() => {
     return historySessions
       .filter(s => !filterMonth || s.date.startsWith(filterMonth))
-      .filter(s => !filterExerciseId || s.exerciseId === filterExerciseId)
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [historySessions, filterMonth, filterExerciseId]);
+  }, [historySessions, filterMonth]);
 
   // All exercises = DEFAULT + custom, merged
   const allExercises = useMemo(() => {
