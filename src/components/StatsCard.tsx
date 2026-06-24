@@ -4,28 +4,31 @@ import type { WorkoutSession } from '../types';
 
 interface StatsCardProps {
   sessions: WorkoutSession[];
+  filterMonth: string;
 }
 
-const StatsCard: React.FC<StatsCardProps> = ({ sessions }) => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth() + 1;
-  const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
-
+const StatsCard: React.FC<StatsCardProps> = ({ sessions, filterMonth }) => {
   const stats = useMemo(() => {
-    const thisMonthSessions = sessions.filter(s => s.date.startsWith(monthPrefix));
+    const thisMonthSessions = sessions.filter(s => s.date.startsWith(filterMonth));
 
     // 운동 일수 (unique dates)
     const uniqueDates = new Set(thisMonthSessions.map(s => s.date));
     const workoutDays = uniqueDates.size;
 
-    // 총 볼륨
     let totalVolume = 0;
+    let totalCardioTime = 0;
     thisMonthSessions.forEach(s => {
+      const ex = DEFAULT_EXERCISES.find(e => e.id === s.exerciseId);
+      const isCardio = ex?.category === 'cardio';
+
       s.sets.forEach(set => {
-        set.subSets.forEach(ss => {
-          totalVolume += ss.weight * ss.reps;
-        });
+        if (isCardio) {
+          totalCardioTime += (set.time || 0);
+        } else if (set.subSets) {
+          set.subSets.forEach(ss => {
+            totalVolume += ss.weight * ss.reps;
+          });
+        }
       });
     });
 
@@ -40,10 +43,12 @@ const StatsCard: React.FC<StatsCardProps> = ({ sessions }) => {
     const sorted = Object.entries(catCount).sort((a, b) => b[1] - a[1]);
     const maxCount = sorted[0]?.[1] || 1;
 
-    return { workoutDays, totalVolume, sorted, maxCount };
-  }, [sessions, monthPrefix]);
+    return { workoutDays, totalVolume, totalCardioTime, sorted, maxCount };
+  }, [sessions, filterMonth]);
 
-  const { workoutDays, totalVolume, sorted, maxCount } = stats;
+  const { workoutDays, totalVolume, totalCardioTime, sorted, maxCount } = stats;
+
+  const displayMonth = filterMonth ? parseInt(filterMonth.split('-')[1], 10) + '월' : '';
 
   const getCatName = (id: string) => CATEGORIES.find(c => c.id === id)?.name ?? id;
 
@@ -52,12 +57,17 @@ const StatsCard: React.FC<StatsCardProps> = ({ sessions }) => {
       <div className="stats-row-top">
         <div className="stat-item">
           <span className="stat-num">{workoutDays}<span className="stat-unit">일</span></span>
-          <span className="stat-desc">이번 달 운동</span>
+          <span className="stat-desc">{displayMonth} 운동일</span>
         </div>
         <div className="stat-divider" />
         <div className="stat-item">
           <span className="stat-num">{totalVolume.toLocaleString()}<span className="stat-unit">kg</span></span>
-          <span className="stat-desc">이번 달 총 볼륨</span>
+          <span className="stat-desc">{displayMonth} 볼륨</span>
+        </div>
+        <div className="stat-divider" />
+        <div className="stat-item">
+          <span className="stat-num">{totalCardioTime}<span className="stat-unit">분</span></span>
+          <span className="stat-desc">{displayMonth} 유산소</span>
         </div>
       </div>
 
@@ -142,9 +152,10 @@ const StatsCard: React.FC<StatsCardProps> = ({ sessions }) => {
         .bar-label {
           font-size: 0.7rem;
           color: var(--muted-color);
-          width: 28px;
+          width: 38px;
           text-align: right;
           flex-shrink: 0;
+          white-space: nowrap;
         }
         .bar-track {
           flex: 1;

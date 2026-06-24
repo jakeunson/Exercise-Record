@@ -21,6 +21,7 @@ export interface SetRecord {
   // For cardio
   distance?: number;
   time?: number;
+  calories?: number;
 }
 
 export interface Exercise {

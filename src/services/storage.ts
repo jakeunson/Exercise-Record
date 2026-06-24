@@ -1,4 +1,4 @@
-import type { WorkoutSession, SetRecord, InBodyRecord, ExerciseSettings, CustomExercise } from '../types';
+import type { WorkoutSession, SetRecord, InBodyRecord, ExerciseSettings, CustomExercise, SubSet } from '../types';
 
 const STORAGE_KEY = 'workout_records';
 const EXERCISE_SETTINGS_KEY = 'exercise_settings';
@@ -39,7 +39,16 @@ export const StorageService = {
   saveInBody: (record: InBodyRecord) => {
     const history = StorageService.getInBodyHistory();
     const updated = [record, ...history.filter(r => r.date !== record.date)];
-    localStorage.setItem('inbody_history', JSON.stringify(updated));
+    localStorage.setItem('inbody_history', JSON.stringify(updated.sort((a, b) => b.date.localeCompare(a.date))));
+  },
+
+  updateInBody: (oldDate: string, record: InBodyRecord) => {
+    let history = StorageService.getInBodyHistory();
+    history = history.filter(r => r.date !== oldDate);
+    // If the new date already exists in history, we overwrite it as well
+    history = history.filter(r => r.date !== record.date);
+    const updated = [record, ...history];
+    localStorage.setItem('inbody_history', JSON.stringify(updated.sort((a, b) => b.date.localeCompare(a.date))));
   },
 
   getInBodyHistory: (): InBodyRecord[] => {
@@ -55,7 +64,7 @@ export const StorageService = {
 
   getPreviousSetRecord: (exerciseId: string, setIndex: number): SetRecord | null => {
     const sessions = StorageService.getSessions();
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
 
     const pastSessions = sessions
       .filter((s) => s.exerciseId === exerciseId && s.date < today)
@@ -67,6 +76,35 @@ export const StorageService = {
     }
 
     return null;
+  },
+
+  getLatestSession: (exerciseId: string): WorkoutSession | null => {
+    const sessions = StorageService.getSessions();
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+
+    const pastSessions = sessions
+      .filter((s) => s.exerciseId === exerciseId && s.date < today)
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    return pastSessions.length > 0 ? pastSessions[0] : null;
+  },
+
+  updateSession: (oldExerciseId: string, oldDate: string, updated: WorkoutSession) => {
+    let sessions = StorageService.getSessions();
+    // Remove the old one first
+    sessions = sessions.filter(
+      (s) => !(s.exerciseId === oldExerciseId && s.date === oldDate)
+    );
+    // Check if there is an existing session with the new exerciseId and date
+    const existingIndex = sessions.findIndex(
+      (s) => s.exerciseId === updated.exerciseId && s.date === updated.date
+    );
+    if (existingIndex > -1) {
+      sessions[existingIndex] = updated;
+    } else {
+      sessions.push(updated);
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
   },
 
   // Export/Import
@@ -157,5 +195,15 @@ export const StorageService = {
   getWorkoutDates: (): Set<string> => {
     const sessions = StorageService.getSessions();
     return new Set(sessions.map(s => s.date));
+  },
+
+  // Ongoing Workouts
+  getOngoingWorkouts: (): Record<string, { sets: SetRecord[]; tempSubSets: SubSet[] }> => {
+    const saved = localStorage.getItem('ongoing_workouts_state');
+    return saved ? JSON.parse(saved) : {};
+  },
+
+  saveOngoingWorkouts: (state: Record<string, { sets: SetRecord[]; tempSubSets: SubSet[] }>) => {
+    localStorage.setItem('ongoing_workouts_state', JSON.stringify(state));
   },
 };

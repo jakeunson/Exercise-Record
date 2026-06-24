@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface WorkoutCalendarProps {
   workoutDates: Set<string>;
@@ -8,9 +9,11 @@ const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
 const WorkoutCalendar: React.FC<WorkoutCalendarProps> = ({ workoutDates }) => {
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-  const year = today.getFullYear();
-  const month = today.getMonth();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const [currentDate, setCurrentDate] = useState(new Date());
+  
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
 
   const calendarData = useMemo(() => {
     const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
@@ -28,10 +31,15 @@ const WorkoutCalendar: React.FC<WorkoutCalendarProps> = ({ workoutDates }) => {
 
   const monthLabel = `${year}년 ${month + 1}월`;
 
+  const handlePrevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
+  const handleNextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+
   return (
     <div className="workout-calendar">
       <div className="cal-header">
+        <button className="cal-nav-btn" onClick={handlePrevMonth}><ChevronLeft size={16} /></button>
         <span className="cal-month">{monthLabel}</span>
+        <button className="cal-nav-btn" onClick={handleNextMonth}><ChevronRight size={16} /></button>
       </div>
       <div className="cal-day-labels">
         {DAY_LABELS.map(d => (
@@ -67,8 +75,23 @@ const WorkoutCalendar: React.FC<WorkoutCalendarProps> = ({ workoutDates }) => {
         .cal-header {
           display: flex;
           align-items: center;
-          margin-bottom: 8px;
+          justify-content: space-between;
+          margin-bottom: 12px;
+          padding: 0 4px;
         }
+        .cal-nav-btn {
+          background: none;
+          border: none;
+          color: var(--muted-color);
+          padding: 4px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          transition: background 0.2s;
+        }
+        .cal-nav-btn:active { background: rgba(255,255,255,0.1); }
         .cal-month {
           font-size: 0.8rem;
           font-weight: 700;
