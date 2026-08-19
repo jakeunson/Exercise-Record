@@ -83,13 +83,13 @@ button {
   display: flex;
   flex-direction: column;
   padding: 0 20px 20px;
-  gap: 12px;
+  gap: 0;
 }
 
 /* Z Flip Cover Screen specific adjustments */
 @media (max-aspect-ratio: 1/1) {
   .step-container {
     padding: 0 10px 10px;
-    gap: 6px;
+    gap: 0;
   }
 }

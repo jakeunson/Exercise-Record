@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface RestTimerProps {
   duration: number; // seconds
@@ -36,54 +36,56 @@ const RestTimer: React.FC<RestTimerProps> = ({ duration, timerKey, onComplete, o
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timerKey, duration]);
 
-  const radius = 28;
+  const radius = 38;
   const circumference = 2 * Math.PI * radius;
-  const progress = remaining / duration;
+  const progress = duration > 0 ? remaining / duration : 0;
   const strokeDashoffset = circumference * (1 - progress);
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className="rest-timer-bar"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 10 }}
-      >
-        <div className="timer-ring-wrap">
-          <svg width={68} height={68} viewBox="0 0 68 68">
-            {/* Background circle */}
+    <motion.div
+      className="rest-timer-modal-full"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.2 }}
+    >
+      <div className="rest-timer-content-box">
+        {/* Left: Circular Ring Timer */}
+        <div className="timer-ring-wrap-large">
+          <svg width={94} height={94} viewBox="0 0 94 94">
             <circle
-              cx={34} cy={34} r={radius}
+              cx={47} cy={47} r={radius}
               fill="none"
-              stroke="rgba(255,255,255,0.1)"
-              strokeWidth={5}
+              stroke="rgba(255,255,255,0.08)"
+              strokeWidth={7}
             />
-            {/* Progress circle */}
             <motion.circle
-              cx={34} cy={34} r={radius}
+              cx={47} cy={47} r={radius}
               fill="none"
               stroke="var(--accent-color)"
-              strokeWidth={5}
+              strokeWidth={7}
               strokeLinecap="round"
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
-              transform="rotate(-90 34 34)"
+              transform="rotate(-90 47 47)"
               style={{ transition: 'stroke-dashoffset 1s linear' }}
             />
           </svg>
-          <span className="timer-count">{remaining}</span>
+          <span className="timer-count-large">{remaining}</span>
         </div>
 
-        <div className="timer-info">
-          <span className="timer-label">휴식 중</span>
-          <span className="timer-sub">세트 간 휴식 타이머</span>
+        {/* Middle: Timer Info */}
+        <div className="timer-info-large">
+          <span className="timer-label-large">휴식 중</span>
+          <span className="timer-sub-large">세트 간 휴식 타이머</span>
         </div>
 
-        <button className="timer-skip-btn" onClick={onSkip}>
+        {/* Right: Skip Button */}
+        <button className="timer-skip-btn-large" onClick={onSkip}>
           건너뜀
         </button>
-      </motion.div>
-    </AnimatePresence>
+      </div>
+    </motion.div>
   );
 };
 

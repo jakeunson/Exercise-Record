@@ -1,5 +1,5 @@
 import localforage from 'localforage';
-import type { WorkoutSession, SetRecord, InBodyRecord, ExerciseSettings, CustomExercise, SubSet } from '../types';
+import type { WorkoutSession, SetRecord, InBodyRecord, ExerciseSettings, CustomExercise, SubSet, UserProfile } from '../types';
 
 const KEYS = {
   SESSIONS: 'workout_records',
@@ -8,7 +8,8 @@ const KEYS = {
   CUSTOM_EXERCISES: 'custom_exercises',
   TIMER: 'timer_duration',
   THEME: 'accent_theme',
-  ONGOING: 'ongoing_workouts_state'
+  ONGOING: 'ongoing_workouts_state',
+  USER_PROFILE: 'user_profile'
 };
 
 // Hybrid Cache
@@ -19,7 +20,9 @@ const cache = {
   customExercises: [] as CustomExercise[],
   timer: 60,
   theme: '#00E676',
-  ongoing: {} as Record<string, { sets: SetRecord[]; tempSubSets: SubSet[] }>
+  ongoing: {} as Record<string, { sets: SetRecord[]; tempSubSets: SubSet[] }>,
+  ongoingDate: '' as string,
+  userProfile: { gender: null, birthYear: null } as UserProfile
 };
 
 export const StorageService = {
@@ -63,7 +66,32 @@ export const StorageService = {
     cache.timer = typeof savedTimer === 'string' ? parseInt(savedTimer, 10) : savedTimer;
     
     cache.theme = await loadSafe(KEYS.THEME, '#00E676');
-    cache.ongoing = await loadSafe(KEYS.ONGOING, {});
+    cache.userProfile = await loadSafe(KEYS.USER_PROFILE, { gender: null, birthYear: null });
+
+    // 00시(자정) 기준 임시 저장 초기화
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+    const rawOngoing = await loadSafe<any>(KEYS.ONGOING, null);
+    if (rawOngoing) {
+      if (rawOngoing.date && rawOngoing.state) {
+        if (rawOngoing.date === today) {
+          cache.ongoing = rawOngoing.state;
+          cache.ongoingDate = today;
+        } else {
+          // 날짜가 지남 (00시 경과) -> 자동 삭제
+          cache.ongoing = {};
+          cache.ongoingDate = today;
+          await localforage.setItem(KEYS.ONGOING, { date: today, state: {} });
+        }
+      } else {
+        // 기존 단일 객체 포맷 호환
+        cache.ongoing = rawOngoing;
+        cache.ongoingDate = today;
+        await localforage.setItem(KEYS.ONGOING, { date: today, state: rawOngoing });
+      }
+    } else {
+      cache.ongoing = {};
+      cache.ongoingDate = today;
+    }
 
     StorageService.isInitialized = true;
   },
@@ -73,10 +101,20 @@ export const StorageService = {
   getInBodyHistory: () => cache.inBody,
   getTimerDuration: () => cache.timer,
   getTheme: () => cache.theme,
+  getUserProfile: () => cache.userProfile,
   getExerciseSettings: () => cache.settings,
   getExerciseSetting: (exerciseId: string) => cache.settings.find(s => s.exerciseId === exerciseId) ?? { exerciseId, showName: true },
   getCustomExercises: () => cache.customExercises,
-  getOngoingWorkouts: () => cache.ongoing,
+  getOngoingWorkouts: () => {
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+    if (cache.ongoingDate && cache.ongoingDate !== today) {
+      // 앱이 켜진 상태에서 00시가 지난 경우 자동 리셋
+      cache.ongoing = {};
+      cache.ongoingDate = today;
+      localforage.setItem(KEYS.ONGOING, { date: today, state: {} });
+    }
+    return cache.ongoing;
+  },
   getWorkoutDates: () => new Set(cache.sessions.map(s => s.date)),
 
   getPreviousSetRecord: (exerciseId: string, setIndex: number): SetRecord | null => {
@@ -98,16 +136,19 @@ export const StorageService = {
   // Setters (Synchronous Cache + Asynchronous DB)
   saveSession: (session: WorkoutSession) => {
     const existingIndex = cache.sessions.findIndex(s => s.exerciseId === session.exerciseId && s.date === session.date);
-    if (existingIndex > -1) cache.sessions[existingIndex] = session;
-    else cache.sessions.push(session);
+    const newSessions = [...cache.sessions];
+    if (existingIndex > -1) newSessions[existingIndex] = session;
+    else newSessions.push(session);
+    cache.sessions = newSessions;
     localforage.setItem(KEYS.SESSIONS, cache.sessions);
   },
 
   updateSession: (oldExerciseId: string, oldDate: string, updated: WorkoutSession) => {
-    cache.sessions = cache.sessions.filter(s => !(s.exerciseId === oldExerciseId && s.date === oldDate));
-    const existingIndex = cache.sessions.findIndex(s => s.exerciseId === updated.exerciseId && s.date === updated.date);
-    if (existingIndex > -1) cache.sessions[existingIndex] = updated;
-    else cache.sessions.push(updated);
+    let newSessions = cache.sessions.filter(s => !(s.exerciseId === oldExerciseId && s.date === oldDate));
+    const existingIndex = newSessions.findIndex(s => s.exerciseId === updated.exerciseId && s.date === updated.date);
+    if (existingIndex > -1) newSessions[existingIndex] = updated;
+    else newSessions.push(updated);
+    cache.sessions = newSessions;
     localforage.setItem(KEYS.SESSIONS, cache.sessions);
   },
 
@@ -143,6 +184,11 @@ export const StorageService = {
     localforage.setItem(KEYS.THEME, cache.theme);
   },
 
+  saveUserProfile: (profile: UserProfile) => {
+    cache.userProfile = profile;
+    localforage.setItem(KEYS.USER_PROFILE, cache.userProfile);
+  },
+
   saveExerciseSetting: (setting: ExerciseSettings) => {
     const idx = cache.settings.findIndex(s => s.exerciseId === setting.exerciseId);
     if (idx > -1) cache.settings[idx] = setting;
@@ -165,8 +211,10 @@ export const StorageService = {
   },
 
   saveOngoingWorkouts: (state: Record<string, { sets: SetRecord[]; tempSubSets: SubSet[] }>) => {
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
     cache.ongoing = state;
-    localforage.setItem(KEYS.ONGOING, cache.ongoing);
+    cache.ongoingDate = today;
+    localforage.setItem(KEYS.ONGOING, { date: today, state: cache.ongoing });
   },
 
   exportData: () => {

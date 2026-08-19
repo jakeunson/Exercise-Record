@@ -20,11 +20,16 @@ export const useWorkoutState = () => {
     setCustomExercises(StorageService.getCustomExercises());
   }, []);
 
+  const reloadOngoingWorkouts = useCallback(() => {
+    setOngoingWorkouts({ ...StorageService.getOngoingWorkouts() });
+  }, []);
+
   return {
     ongoingWorkouts,
     updateOngoingWorkouts,
     customExercises,
     saveCustomExercise,
-    reloadCustomExercises
+    reloadCustomExercises,
+    reloadOngoingWorkouts
   };
 };

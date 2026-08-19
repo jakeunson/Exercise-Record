@@ -2,6 +2,8 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Download, Share2, Upload } from 'lucide-react';
 
+import type { UserProfile } from '../types';
+
 const THEMES = [
   { name: 'Spring Green', color: '#00E676' },
   { name: 'Neon Blue',    color: '#00B0FF' },
@@ -19,6 +21,8 @@ const TIMER_OPTIONS = [
 ];
 
 interface SettingsViewProps {
+  userProfile: UserProfile;
+  updateUserProfile: (profile: UserProfile) => void;
   accentColor: string;
   applyTheme: (color: string) => void;
   timerDuration: number;
@@ -31,6 +35,7 @@ interface SettingsViewProps {
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({
+  userProfile, updateUserProfile,
   accentColor, applyTheme,
   timerDuration, setTimerDuration,
   handleExport, handleImport, importStatus,
@@ -43,7 +48,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: -20, opacity: 0 }}
       className="step-container"
-      style={{ overflowY: 'auto' }}
     >
       <header className="record-header">
         <button onClick={() => setStep('category')} className="back-btn">
@@ -53,7 +57,41 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="header-right" />
       </header>
       
-      <div className="settings-list">
+      <div className="view-scroll-content">
+        <div className="settings-list">
+        
+        {/* User Profile */}
+        <div className="settings-section">
+          <h2>개인 프로필</h2>
+          <p>인바디 체형 자동 판별 정확도를 높이는 데 사용됩니다.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <span style={{ width: '60px', color: 'var(--muted-color)', fontSize: '0.9rem' }}>성별</span>
+              <div className="timer-options" style={{ marginTop: 0 }}>
+                <button
+                  className={`timer-opt-btn ${userProfile.gender === 'male' ? 'active' : ''}`}
+                  onClick={() => updateUserProfile({ ...userProfile, gender: 'male' })}
+                >남성</button>
+                <button
+                  className={`timer-opt-btn ${userProfile.gender === 'female' ? 'active' : ''}`}
+                  onClick={() => updateUserProfile({ ...userProfile, gender: 'female' })}
+                >여성</button>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <span style={{ width: '60px', color: 'var(--muted-color)', fontSize: '0.9rem' }}>출생연도</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className="icon-btn edit" style={{ width: '36px', height: '36px', background: 'var(--border-color)', borderRadius: '8px' }} onClick={() => updateUserProfile({ ...userProfile, birthYear: Math.max(1940, (userProfile.birthYear || 1990) - 1) })}>-</button>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '60px', fontSize: '1.1rem', fontWeight: 600 }}>
+                  {userProfile.birthYear || '----'}
+                </div>
+                <button className="icon-btn edit" style={{ width: '36px', height: '36px', background: 'var(--border-color)', borderRadius: '8px' }} onClick={() => updateUserProfile({ ...userProfile, birthYear: Math.min(new Date().getFullYear(), (userProfile.birthYear || 1990) + 1) })}>+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Feature 4: Theme */}
         <div className="settings-section">
           <h2>테마 컬러</h2>
@@ -125,7 +163,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           <span>백업 파일(.json)을 카카오톡 나에게 보내기 등으로 공유한 뒤, 다른 기기에서 불러오시면 됩니다.</span>
         </div>
       </div>
-    </motion.div>
+    </div>
+  </motion.div>
   );
 };
 

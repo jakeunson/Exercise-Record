@@ -2,11 +2,9 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Activity, History, Settings } from 'lucide-react';
 import { CATEGORIES } from '../types';
-import type { Category } from '../types';
-import WorkoutCalendar from '../components/WorkoutCalendar';
-
-// It is safe to use string literals if Step type is not exported or we can just use `string`
-// But we can import it if it's exported. Let's assume it's passed down as an opaque function.
+import type { Category, WorkoutSession, Exercise } from '../types';
+import HeatmapWidget from '../components/HeatmapWidget';
+import BadgeShowcase from '../components/BadgeShowcase';
 
 const CATEGORY_IMAGES: Record<string, string> = {
   chest: '/category_icons/chest.jpg',
@@ -21,14 +19,16 @@ interface CategoryViewProps {
   activeCategories: Set<Category>;
   selectCategory: (cat: Category) => void;
   setStep: (step: any) => void;
-  workoutDates: Set<string>;
+  historySessions: WorkoutSession[];
+  allExercises: Exercise[];
 }
 
 const CategoryView: React.FC<CategoryViewProps> = ({
   activeCategories,
   selectCategory,
   setStep,
-  workoutDates
+  historySessions,
+  allExercises
 }) => {
   return (
     <motion.div
@@ -57,7 +57,7 @@ const CategoryView: React.FC<CategoryViewProps> = ({
         </div>
       </header>
 
-      {/* 카테고리 그리드가 위, 달력이 아래 */}
+      {/* 카테고리 그리드 */}
       <div className="category-grid">
         {CATEGORIES.map((cat) => {
           const isActive = activeCategories.has(cat.id);
@@ -76,7 +76,10 @@ const CategoryView: React.FC<CategoryViewProps> = ({
         })}
       </div>
 
-      <WorkoutCalendar workoutDates={workoutDates} />
+      <div className="home-dashboard">
+        <HeatmapWidget sessions={historySessions} allExercises={allExercises} />
+        <BadgeShowcase sessions={historySessions} allExercises={allExercises} />
+      </div>
     </motion.div>
   );
 };

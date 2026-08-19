@@ -52,6 +52,11 @@ export interface InBodyRecord {
   bodyFatPercentage: number;
 }
 
+export interface UserProfile {
+  gender: 'male' | 'female' | null;
+  birthYear: number | null;
+}
+
 export const DEFAULT_EXERCISES: Exercise[] = [
   // Chest
   { id: 'bench-press', name: '벤치 프레스', category: 'chest' },
