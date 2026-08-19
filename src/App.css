@@ -358,10 +358,32 @@
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); }
 .confirm-modal { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 20px; padding: 20px; width: 85%; max-width: 300px; text-align: center; display: flex; flex-direction: column; gap: 12px; }
+.exit-modal {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  width: min(85%, 260px);
+  padding: clamp(12px, 4vw, 24px);
+  font-size: clamp(0.8rem, 3vw, 1rem);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2vw, 12px);
+}
+.exit-modal h3 { font-size: clamp(0.9rem, 4vw, 1.2rem); margin: 0; }
+.exit-modal p { margin: 0; }
+.exit-modal button {
+  padding: clamp(8px, 2.5vw, 14px);
+  font-size: clamp(0.8rem, 3vw, 1rem);
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+}
 .modal-actions { display: flex; gap: 12px; margin-top: 8px; }
-.modal-actions button { flex: 1; padding: 14px; border-radius: 12px; font-weight: 700; }
+.modal-actions button { flex: 1; padding: 14px; border-radius: 12px; font-weight: 700; border: none; cursor: pointer; }
 .cancel-btn { background: var(--border-color); color: var(--fg-color); }
-.confirm-delete-btn { background: #ff4444; color: white; }
+.secondary-btn { background: rgba(255, 255, 255, 0.1); color: var(--fg-color); }
+.danger-btn, .confirm-delete-btn { background: #ff4444; color: white; }
 
 .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted-color); font-size: 0.9rem; }
 .title-area h1 { margin: 0; }

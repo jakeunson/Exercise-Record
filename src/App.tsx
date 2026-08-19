@@ -581,12 +581,12 @@ const App: React.FC = () => {
       <AnimatePresence>
         {showExitModal && (
           <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <motion.div className="modal-content" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}>
+            <motion.div className="modal-content exit-modal" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}>
               <h3>앱 종료</h3>
               <p>앱을 종료하시겠습니까?</p>
-              <div className="modal-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-                <button className="secondary-btn" onClick={() => setShowExitModal(false)} style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '1rem', cursor: 'pointer' }}>취소</button>
-                <button className="danger-btn" onClick={() => CapacitorApp.exitApp()} style={{ flex: 1, padding: '12px', background: '#ff4444', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '1rem', cursor: 'pointer' }}>종료</button>
+              <div className="modal-actions">
+                <button className="secondary-btn" onClick={() => setShowExitModal(false)}>취소</button>
+                <button className="danger-btn" onClick={() => CapacitorApp.exitApp()}>종료</button>
               </div>
             </motion.div>
           </motion.div>

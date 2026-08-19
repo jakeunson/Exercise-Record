@@ -48,12 +48,16 @@ body {
 
 #root {
   width: 100%;
-  height: 100%;
   height: 100dvh;
   max-width: 500px; /* For desktop testing */
   background-color: var(--bg-color);
   position: relative;
   overflow: hidden;
+  /* Safe area padding to prevent overlapping with system UI (status bar, navigation bar) */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
 /* Custom Scrollbar for list */
