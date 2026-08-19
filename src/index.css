@@ -27,9 +27,18 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+html {
+  background-color: var(--bg-color);
+  color-scheme: dark;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   width: 100vw;
-  height: 100vh;
+  height: 100%;
+  height: 100dvh;
   overflow: hidden;
   background-color: var(--bg-color);
   display: flex;
@@ -40,6 +49,7 @@ body {
 #root {
   width: 100%;
   height: 100%;
+  height: 100dvh;
   max-width: 500px; /* For desktop testing */
   background-color: var(--bg-color);
   position: relative;
