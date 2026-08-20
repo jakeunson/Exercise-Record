@@ -1,11 +1,10 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Plus } from 'lucide-react';
-import { CATEGORIES } from '../types';
-import type { Category, Exercise, CustomExercise, ExerciseSettings, SetRecord, SubSet } from '../types';
+import type { Exercise, CustomExercise, ExerciseSettings, SetRecord, SubSet } from '../types';
 
 interface SelectExerciseViewProps {
-  selectedCategory: Category | null;
+  selectedCategoryName: string;
   filteredExercises: Exercise[];
   ongoingWorkouts: Record<string, { sets: SetRecord[]; tempSubSets: SubSet[] }>;
   getExSetting: (exerciseId: string) => ExerciseSettings;
@@ -17,7 +16,7 @@ interface SelectExerciseViewProps {
 }
 
 const SelectExerciseView: React.FC<SelectExerciseViewProps> = ({
-  selectedCategory,
+  selectedCategoryName,
   filteredExercises,
   ongoingWorkouts,
   getExSetting,
@@ -39,7 +38,7 @@ const SelectExerciseView: React.FC<SelectExerciseViewProps> = ({
         <button onClick={() => setStep('category')} className="back-btn">
           <ArrowLeft size={20} />
         </button>
-        <h1>{CATEGORIES.find(c => c.id === selectedCategory)?.name} 운동</h1>
+        <h1>{selectedCategoryName}</h1>
         <div className="header-right" />
       </header>
       
@@ -65,9 +64,6 @@ const SelectExerciseView: React.FC<SelectExerciseViewProps> = ({
                 )}
                 {setting.showName && (
                   <span className={setting.customImage ? 'ex-name-overlay' : ''}>{ex.name}</span>
-                )}
-                {!setting.customImage && !setting.showName && (
-                  <span style={{ fontSize: '1.5rem' }}>🏋️</span>
                 )}
               </button>
             );

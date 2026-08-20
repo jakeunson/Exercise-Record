@@ -310,7 +310,6 @@ const RecordView: React.FC<RecordViewProps> = ({
         </button>
         <h1>{selectedExercise.name}</h1>
         <div className="header-right">
-          <button className="finish-top-btn" onClick={handleFinishWorkout}>운동 종료</button>
         </div>
       </header>
 
@@ -464,6 +463,17 @@ const RecordView: React.FC<RecordViewProps> = ({
             </div>
           ))}
         </div>
+        
+        {/* Bottom Finish Button */}
+        <div style={{ padding: '24px 20px 40px', display: 'flex', justifyContent: 'center' }}>
+          <button 
+            className="large-finish-btn" 
+            style={{ width: '100%', background: 'var(--accent-color)', color: '#000', border: 'none' }}
+            onClick={handleFinishWorkout}
+          >
+            운동 종료
+          </button>
+        </div>
       </div>
 
       <AnimatePresence>
@@ -474,6 +484,7 @@ const RecordView: React.FC<RecordViewProps> = ({
             timerKey={timerKey}
             onComplete={stopTimer}
             onSkip={stopTimer}
+            onFinishWorkout={handleFinishWorkout}
           />
         )}
       </AnimatePresence>

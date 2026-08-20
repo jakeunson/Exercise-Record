@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Download, Share2, Upload } from 'lucide-react';
+import { ArrowLeft, Download, Share2, Upload, BookOpen } from 'lucide-react';
+import UserGuideModal from '../components/modals/UserGuideModal';
 
 import type { UserProfile } from '../types';
 
@@ -41,6 +42,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   handleExport, handleImport, importStatus,
   fileInputRef, setStep
 }) => {
+  const [showGuide, setShowGuide] = useState(false);
+
   return (
     <motion.div
       key="settings"
@@ -60,6 +63,18 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="view-scroll-content">
         <div className="settings-list">
         
+        {/* User Guide Button */}
+        <div className="settings-section" style={{ padding: '16px', background: 'var(--card-bg)', borderRadius: '12px' }}>
+          <button 
+            className="settings-btn" 
+            onClick={() => setShowGuide(true)}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', background: 'transparent', border: 'none', color: 'var(--text-color)', fontSize: '1.1rem', fontWeight: 600, padding: 0 }}
+          >
+            <BookOpen size={22} color="var(--accent-color)" />
+            <span>📖 앱 사용 가이드 보기</span>
+          </button>
+        </div>
+
         {/* User Profile */}
         <div className="settings-section">
           <h2>개인 프로필</h2>
@@ -164,6 +179,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
     </div>
+    
+    {showGuide && <UserGuideModal onClose={() => setShowGuide(false)} />}
   </motion.div>
   );
 };

@@ -3,7 +3,7 @@ import { WorkoutRepository, InBodyRepository, SettingsRepository } from '../repo
 export const ExportService = {
   exportData: (): string => {
     const data = {
-      version: 1,
+      version: 2,
       sessions: WorkoutRepository.getAllSessions(),
       inBody: InBodyRepository.getAll(),
       settings: SettingsRepository.getExerciseSettings(),
@@ -11,6 +11,8 @@ export const ExportService = {
       timer: SettingsRepository.getTimerDuration(),
       theme: SettingsRepository.getTheme(),
       userProfile: SettingsRepository.getUserProfile(),
+      categories: SettingsRepository.getCategories(),
+      exerciseCategoryOverrides: SettingsRepository.getExerciseCategoryOverrides(),
       exportDate: new Date().toISOString()
     };
     return JSON.stringify(data);
@@ -28,6 +30,8 @@ export const ExportService = {
       if (parsed.timer) SettingsRepository.saveTimerDuration(parsed.timer);
       if (parsed.theme) SettingsRepository.saveTheme(parsed.theme);
       if (parsed.userProfile) SettingsRepository.saveUserProfile(parsed.userProfile);
+      if (parsed.categories) SettingsRepository.saveCategories(parsed.categories);
+      if (parsed.exerciseCategoryOverrides) SettingsRepository.saveAllCategoryOverrides(parsed.exerciseCategoryOverrides);
       
       return true;
     } catch (e) {

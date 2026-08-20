@@ -8,7 +8,9 @@ const KEYS = {
   TIMER: 'timer_duration',
   THEME: 'accent_theme',
   ONGOING: 'ongoing_workouts_state',
-  USER_PROFILE: 'user_profile'
+  USER_PROFILE: 'user_profile',
+  CATEGORIES: 'custom_categories',
+  CATEGORY_OVERRIDES: 'exercise_category_overrides'
 };
 
 export const StorageKeys = KEYS;

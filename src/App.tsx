@@ -26,6 +26,8 @@ import InBodyInputView from './views/InBodyInputView';
 import SettingsView from './views/SettingsView';
 import ConfirmDeleteModal from './components/modals/ConfirmDeleteModal';
 import AddCustomExerciseModal from './components/modals/AddCustomExerciseModal';
+import AddCategoryModal from './components/modals/AddCategoryModal';
+import CategoryEditModal from './components/modals/CategoryEditModal';
 import './App.css';
 
 type Step = 'category' | 'select' | 'record' | 'summary' | 'history' | 'inbody' | 'inbody_list' | 'settings';
@@ -35,7 +37,7 @@ const App: React.FC = () => {
 
   const [step, setStep] = useState<Step>('category');
   const [showExitModal, setShowExitModal] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
 
   const [currentSets, setCurrentSets] = useState<SetRecord[]>([]);
@@ -51,6 +53,8 @@ const App: React.FC = () => {
   const [deletingInBody, setDeletingInBody] = useState<string | null>(null);
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
   const [showAddExercise, setShowAddExercise] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<any | null>(null); // any for now, since it's CategoryItem
+  const [showAddCategory, setShowAddCategory] = useState(false);
   const [newExName, setNewExName] = useState('');
   
   const showToast = useCallback((msg: string) => {
@@ -71,6 +75,12 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleBackButton = () => {
+      if (editingCategory) { setEditingCategory(null); return; }
+      if (showAddCategory) { setShowAddCategory(false); return; }
+      if (editingExercise) { setEditingExercise(null); return; }
+      if (showAddExercise) { setShowAddExercise(false); return; }
+      if (deletingSession || deletingInBody) { setDeletingSession(null); setDeletingInBody(null); return; }
+
       if (showExitModal) {
         setShowExitModal(false);
         return;
@@ -95,7 +105,7 @@ const App: React.FC = () => {
     return () => {
       listener.then(l => l.remove());
     };
-  }, [step, showExitModal, currentSets.length, showToast]);
+  }, [step, showExitModal, currentSets.length, showToast, editingCategory, showAddCategory, editingExercise, showAddExercise, deletingSession, deletingInBody]);
 
   useEffect(() => {
     const handleVisibilityOrResume = () => {
@@ -151,7 +161,10 @@ const App: React.FC = () => {
     if (!isLoaded) return;
     if (step === 'history') workout.reload();
     if (step === 'inbody_list') inBody.reload();
-    if (step === 'category') workout.reload(); 
+    if (step === 'category') {
+      workout.reload(); 
+      settings.reload();
+    }
   }, [step, isLoaded]); 
 
   const startTimer = useCallback(() => {
@@ -193,11 +206,18 @@ const App: React.FC = () => {
   }, [workout.sessions, filterMonth]);
 
   const allExercises = useMemo(() => {
-    return [...DEFAULT_EXERCISES, ...workout.customExercises] as Exercise[];
-  }, [workout.customExercises]);
+    return [...DEFAULT_EXERCISES, ...workout.customExercises].map(ex => {
+      const overrideCat = settings.exerciseCategoryOverrides[ex.id];
+      const setting = settings.exerciseSettings.find(s => s.exerciseId === ex.id);
+      let updatedEx = { ...ex };
+      if (overrideCat) updatedEx.category = overrideCat as Category;
+      if (setting?.customName) updatedEx.name = setting.customName;
+      return updatedEx;
+    }) as Exercise[];
+  }, [workout.customExercises, settings.exerciseCategoryOverrides, settings.exerciseSettings]);
 
   const activeCategories = useMemo(() => {
-    const activeCats = new Set<Category>();
+    const activeCats = new Set<string>();
     Object.entries(workout.ongoingWorkouts).forEach(([exId, state]) => {
       if (state.sets.length > 0) {
         const ex = allExercises.find(e => e.id === exId);
@@ -224,7 +244,7 @@ const App: React.FC = () => {
     return settings.exerciseSettings.find(s => s.exerciseId === exerciseId) ?? { exerciseId, showName: true };
   }, [settings.exerciseSettings]);
 
-  const selectCategory = (cat: Category) => {
+  const selectCategory = (cat: string) => {
     setSelectedCategory(cat);
     setStep('select');
   };
@@ -372,11 +392,14 @@ const App: React.FC = () => {
       <AnimatePresence mode="wait">
         {step === 'category' && (
           <CategoryView
+            categories={settings.categories}
             activeCategories={activeCategories}
             selectCategory={selectCategory}
             setStep={setStep}
             historySessions={workout.sessions}
             allExercises={allExercises}
+            onAddCategory={() => setShowAddCategory(true)}
+            onEditCategory={(cat) => setEditingCategory(cat)}
           />
         )}
         {step === 'settings' && (
@@ -423,7 +446,7 @@ const App: React.FC = () => {
         )}
         {step === 'select' && (
           <SelectExerciseView
-            selectedCategory={selectedCategory}
+            selectedCategoryName={settings.categories.find(c => c.id === selectedCategory)?.name || '운동 선택'}
             filteredExercises={filteredExercises}
             ongoingWorkouts={workout.ongoingWorkouts}
             getExSetting={getExSetting}
@@ -497,6 +520,11 @@ const App: React.FC = () => {
               workout.reload();
               settings.reload();
             }}
+            categories={settings.categories}
+            onCategoryChanged={() => {
+              settings.reload();
+              workout.reload();
+            }}
           />
         )}
       </AnimatePresence>
@@ -511,6 +539,60 @@ const App: React.FC = () => {
           />
         )}
       </AnimatePresence>
+
+      {showAddCategory && (
+        <AddCategoryModal
+          onClose={() => setShowAddCategory(false)}
+          onAdd={(cat) => {
+            const newCats = [...settings.categories, cat];
+            settings.saveCategories(newCats);
+            setShowAddCategory(false);
+          }}
+        />
+      )}
+
+      {editingCategory && (
+        <CategoryEditModal
+          category={editingCategory}
+          onClose={() => setEditingCategory(null)}
+          onSaved={(updatedCat) => {
+            const idx = settings.categories.findIndex(c => c.id === updatedCat.id);
+            const newCats = [...settings.categories];
+            if (idx >= 0) newCats[idx] = updatedCat;
+            settings.saveCategories(newCats);
+            setEditingCategory(null);
+          }}
+          onDeleted={
+            editingCategory.isCustom ? () => {
+              const newCats = settings.categories.filter(c => c.id !== editingCategory.id);
+              settings.saveCategories(newCats);
+              setEditingCategory(null);
+            } : undefined
+          }
+          onMoveUp={() => {
+            const sortedCats = [...settings.categories].sort((a, b) => (a.order || 0) - (b.order || 0));
+            const idx = sortedCats.findIndex(c => c.id === editingCategory.id);
+            if (idx > 0) {
+              const temp = sortedCats[idx].order;
+              sortedCats[idx].order = sortedCats[idx - 1].order;
+              sortedCats[idx - 1].order = temp;
+              settings.saveCategories(sortedCats);
+              setEditingCategory(sortedCats[idx]);
+            }
+          }}
+          onMoveDown={() => {
+            const sortedCats = [...settings.categories].sort((a, b) => (a.order || 0) - (b.order || 0));
+            const idx = sortedCats.findIndex(c => c.id === editingCategory.id);
+            if (idx >= 0 && idx < sortedCats.length - 1) {
+              const temp = sortedCats[idx].order;
+              sortedCats[idx].order = sortedCats[idx + 1].order;
+              sortedCats[idx + 1].order = temp;
+              settings.saveCategories(sortedCats);
+              setEditingCategory(sortedCats[idx]);
+            }
+          }}
+        />
+      )}
 
       <AnimatePresence>
         {showExitModal && (

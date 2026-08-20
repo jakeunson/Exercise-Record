@@ -1,35 +1,53 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Activity, History, Settings } from 'lucide-react';
-import { CATEGORIES } from '../types';
-import type { Category, WorkoutSession, Exercise } from '../types';
+import { Activity, History, Settings, Plus } from 'lucide-react';
+import type { CategoryItem, WorkoutSession, Exercise } from '../core/types';
 import HeatmapWidget from '../components/HeatmapWidget';
 import BadgeShowcase from '../components/BadgeShowcase';
 
-const CATEGORY_IMAGES: Record<string, string> = {
-  chest: '/category_icons/chest.jpg',
-  back: '/category_icons/back.jpg',
-  legs: '/category_icons/legs.jpg',
-  shoulders: '/category_icons/shoulders.jpg',
-  arms: '/category_icons/arms.jpg',
-  cardio: '/category_icons/cardio.jpg',
-};
-
 interface CategoryViewProps {
-  activeCategories: Set<Category>;
-  selectCategory: (cat: Category) => void;
+  categories: CategoryItem[];
+  activeCategories: Set<string>;
+  selectCategory: (catId: string) => void;
   setStep: (step: any) => void;
   historySessions: WorkoutSession[];
   allExercises: Exercise[];
+  onAddCategory: () => void;
+  onEditCategory: (cat: CategoryItem) => void;
 }
 
 const CategoryView: React.FC<CategoryViewProps> = ({
+  categories,
   activeCategories,
   selectCategory,
   setStep,
   historySessions,
-  allExercises
+  allExercises,
+  onAddCategory,
+  onEditCategory
 }) => {
+  // 롱프레스 로직
+  const pressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleLongPressStart = (cat: CategoryItem) => {
+    pressTimer.current = setTimeout(() => {
+      onEditCategory(cat);
+      if (window.navigator && window.navigator.vibrate) {
+        window.navigator.vibrate(50);
+      }
+    }, 600);
+  };
+
+  const handleLongPressEnd = () => {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
+
+  // categories sort by order
+  const sortedCategories = [...categories].sort((a, b) => (a.order || 0) - (b.order || 0));
+
   return (
     <motion.div
       key="category"
@@ -45,6 +63,9 @@ const CategoryView: React.FC<CategoryViewProps> = ({
           <p>부위를 선택하세요</p>
         </div>
         <div className="header-actions">
+          <button className="icon-trigger" onClick={onAddCategory}>
+            <Plus size={22} />
+          </button>
           <button className="icon-trigger" onClick={() => setStep('inbody_list')}>
             <Activity size={22} />
           </button>
@@ -58,19 +79,29 @@ const CategoryView: React.FC<CategoryViewProps> = ({
       </header>
 
       {/* 카테고리 그리드 */}
-      <div className="category-grid">
-        {CATEGORIES.map((cat) => {
+      <div className="exercise-grid" style={{ paddingBottom: 0 }}>
+        {sortedCategories.map((cat) => {
           const isActive = activeCategories.has(cat.id);
+          const hasImage = !!cat.customImage;
+          const showName = cat.showName !== false;
+
           return (
             <button
               key={cat.id}
-              className={`category-square image-btn ${isActive ? 'active-category' : ''}`}
+              className={`exercise-square ${cat.isCustom ? 'custom-ex' : ''} ${isActive ? 'active-workout' : ''}`}
               onClick={() => selectCategory(cat.id)}
+              onMouseDown={() => handleLongPressStart(cat)}
+              onMouseUp={handleLongPressEnd}
+              onMouseLeave={handleLongPressEnd}
+              onTouchStart={() => handleLongPressStart(cat)}
+              onTouchEnd={handleLongPressEnd}
             >
-              <img src={CATEGORY_IMAGES[cat.id]} alt={cat.name} className="cat-img" />
-              <div className="cat-overlay">
-                <span>{cat.name}</span>
-              </div>
+              {hasImage && (
+                <img src={cat.customImage} alt={cat.name} className="ex-custom-img" />
+              )}
+              {showName && (
+                <span className={hasImage ? 'ex-name-overlay' : ''}>{cat.name}</span>
+              )}
             </button>
           );
         })}

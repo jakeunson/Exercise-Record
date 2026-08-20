@@ -6,11 +6,12 @@ interface RestTimerProps {
   timerKey: number; // change to restart timer
   onComplete: () => void;
   onSkip: () => void;
+  onFinishWorkout?: () => void;
 }
 
 const ADD_SECONDS = 30;
 
-const RestTimer: React.FC<RestTimerProps> = ({ duration, timerKey, onComplete, onSkip }) => {
+const RestTimer: React.FC<RestTimerProps> = ({ duration, timerKey, onComplete, onSkip, onFinishWorkout }) => {
   const [remaining, setRemaining] = useState(duration);
   const [totalDuration, setTotalDuration] = useState(duration);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -99,13 +100,20 @@ const RestTimer: React.FC<RestTimerProps> = ({ duration, timerKey, onComplete, o
       </div>
 
       {/* ── Bottom action buttons ── */}
-      <div className="rt-actions">
-        <button className="rt-add-btn" onClick={handleAddTime}>
-          +{ADD_SECONDS}초
-        </button>
-        <button className="rt-skip-btn" onClick={onSkip}>
-          건너뜀
-        </button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '280px' }}>
+        <div className="rt-actions" style={{ maxWidth: '100%' }}>
+          <button className="rt-add-btn" onClick={handleAddTime}>
+            +{ADD_SECONDS}초
+          </button>
+          <button className="rt-skip-btn" onClick={onSkip}>
+            건너뜀
+          </button>
+        </div>
+        {onFinishWorkout && (
+          <button className="rt-finish-btn" onClick={onFinishWorkout}>
+            운동 종료
+          </button>
+        )}
       </div>
     </motion.div>
   );

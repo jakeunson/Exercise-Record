@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Check } from 'lucide-react';
 import type { InBodyRecord, UserProfile } from '../types';
+import CustomSelect from './CustomSelect';
 
 interface InBodyChartProps {
   data: InBodyRecord[];
@@ -14,8 +14,6 @@ type PeriodType = '1M' | '3M' | '6M' | 'ALL';
 const InBodyChart: React.FC<InBodyChartProps> = ({ data, userProfile }) => {
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [period, setPeriod] = useState<PeriodType>('ALL');
-  const [metricOpen, setMetricOpen] = useState(false);
-  const [periodOpen, setPeriodOpen] = useState(false);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   const metricOptions: { id: TabType; label: string }[] = [
@@ -241,88 +239,24 @@ const InBodyChart: React.FC<InBodyChartProps> = ({ data, userProfile }) => {
       {/* Top Filter Controls: Custom Dark Dropdowns */}
       <div className="chart-select-controls">
         {/* Metric Dropdown */}
-        <div className="custom-dropdown-container">
-          <button 
-            type="button" 
-            className={`custom-dropdown-btn ${metricOpen ? 'open' : ''}`}
-            onClick={() => { setMetricOpen(!metricOpen); setPeriodOpen(false); }}
-          >
-            <span className="dropdown-btn-label">
-              {metricOptions.find(o => o.id === activeTab)?.label}
-            </span>
-            <ChevronDown size={14} className={`dropdown-chevron ${metricOpen ? 'rotated' : ''}`} />
-          </button>
-
-          <AnimatePresence>
-            {metricOpen && (
-              <motion.div 
-                className="custom-dropdown-menu"
-                initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6, scale: 0.96 }}
-                transition={{ duration: 0.15 }}
-              >
-                {metricOptions.map(opt => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    className={`dropdown-menu-item ${activeTab === opt.id ? 'active' : ''}`}
-                    onClick={() => {
-                      setActiveTab(opt.id);
-                      setMetricOpen(false);
-                      setHoverIdx(null);
-                    }}
-                  >
-                    <span>{opt.label}</span>
-                    {activeTab === opt.id && <Check size={14} className="dropdown-check" />}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        <CustomSelect
+          value={activeTab}
+          onChange={(val) => {
+            setActiveTab(val as TabType);
+            setHoverIdx(null);
+          }}
+          options={metricOptions.map(o => ({ value: o.id, label: o.label }))}
+        />
 
         {/* Period Dropdown */}
-        <div className="custom-dropdown-container">
-          <button 
-            type="button" 
-            className={`custom-dropdown-btn ${periodOpen ? 'open' : ''}`}
-            onClick={() => { setPeriodOpen(!periodOpen); setMetricOpen(false); }}
-          >
-            <span className="dropdown-btn-label">
-              {periodOptions.find(o => o.id === period)?.label}
-            </span>
-            <ChevronDown size={14} className={`dropdown-chevron ${periodOpen ? 'rotated' : ''}`} />
-          </button>
-
-          <AnimatePresence>
-            {periodOpen && (
-              <motion.div 
-                className="custom-dropdown-menu"
-                initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6, scale: 0.96 }}
-                transition={{ duration: 0.15 }}
-              >
-                {periodOptions.map(opt => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    className={`dropdown-menu-item ${period === opt.id ? 'active' : ''}`}
-                    onClick={() => {
-                      setPeriod(opt.id);
-                      setPeriodOpen(false);
-                      setHoverIdx(null);
-                    }}
-                  >
-                    <span>{opt.label}</span>
-                    {period === opt.id && <Check size={14} className="dropdown-check" />}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        <CustomSelect
+          value={period}
+          onChange={(val) => {
+            setPeriod(val as PeriodType);
+            setHoverIdx(null);
+          }}
+          options={periodOptions.map(o => ({ value: o.id, label: o.label }))}
+        />
       </div>
 
       {/* Hero Summary Stats (Feature 1) */}
@@ -630,82 +564,7 @@ const InBodyChart: React.FC<InBodyChartProps> = ({ data, userProfile }) => {
           position: relative;
           z-index: 30;
         }
-        .custom-dropdown-container {
-          position: relative;
-          width: 100%;
-        }
-        .custom-dropdown-btn {
-          width: 100%;
-          height: 38px;
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid var(--border-color);
-          border-radius: 12px;
-          padding: 0 12px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          color: var(--fg-color);
-          font-size: 0.82rem;
-          font-weight: 700;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .custom-dropdown-btn.open {
-          border-color: var(--accent-color);
-          background: rgba(0, 230, 118, 0.08);
-        }
-        .dropdown-chevron {
-          color: var(--muted-color);
-          transition: transform 0.2s;
-        }
-        .dropdown-chevron.rotated {
-          transform: rotate(180deg);
-          color: var(--accent-color);
-        }
-        .custom-dropdown-menu {
-          position: absolute;
-          top: calc(100% + 6px);
-          left: 0;
-          right: 0;
-          background: rgba(24, 24, 28, 0.98);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid var(--border-color);
-          border-radius: 14px;
-          padding: 6px;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7);
-          z-index: 50;
-        }
-        .dropdown-menu-item {
-          width: 100%;
-          padding: 10px 12px;
-          border-radius: 10px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          background: transparent;
-          border: none;
-          color: var(--fg-color);
-          font-size: 0.82rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: background 0.15s, color 0.15s;
-          text-align: left;
-        }
-        .dropdown-menu-item:hover, .dropdown-menu-item:active {
-          background: rgba(255, 255, 255, 0.08);
-        }
-        .dropdown-menu-item.active {
-          background: rgba(0, 230, 118, 0.15);
-          color: var(--accent-color);
-          font-weight: 800;
-        }
-        .dropdown-check {
-          color: var(--accent-color);
-        }
+
 
         /* Hero Stats Styles */
         .hero-stat-card {

@@ -2,16 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera as CameraIcon, Image as ImageIcon, Trash2, Eye, EyeOff, X } from 'lucide-react';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import type { Exercise, ExerciseSettings } from '../types';
-import type { CustomExercise } from '../types';
+import type { Exercise, ExerciseSettings, CategoryItem } from '../core/types';
+import type { CustomExercise } from '../core/types';
 import { WorkoutRepository } from '../core/repositories/workoutRepository';
 import { SettingsRepository } from '../core/repositories/settingsRepository';
+import CustomSelect from './CustomSelect';
+import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
 
 interface ExerciseEditModalProps {
   exercise: Exercise;
   onClose: () => void;
   onSaved: () => void;
-  onDeleted?: () => void; // only for custom exercises
+  onDeleted?: () => void;
+  categories: CategoryItem[];
+  onCategoryChanged?: () => void;
 }
 
 
@@ -20,6 +24,8 @@ const ExerciseEditModal: React.FC<ExerciseEditModalProps> = ({
   onClose,
   onSaved,
   onDeleted,
+  categories,
+  onCategoryChanged
 }) => {
   const isCustom = (exercise as CustomExercise).isCustom === true;
 
@@ -27,6 +33,7 @@ const ExerciseEditModal: React.FC<ExerciseEditModalProps> = ({
     SettingsRepository.getExerciseSetting(exercise.id)
   );
   const [customName, setCustomName] = useState(exercise.name);
+  const [selectedCatId, setSelectedCatId] = useState<string>(exercise.category);
   const [previewImage, setPreviewImage] = useState<string | undefined>(settings.customImage);
   const [isLoading, setIsLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -66,16 +73,36 @@ const ExerciseEditModal: React.FC<ExerciseEditModalProps> = ({
   };
 
   const handleSave = () => {
-    // 1. 설정 저장 (이미지, 표시 여부 등)
-    SettingsRepository.saveExerciseSetting(settings);
+    if (!customName.trim()) return;
 
-    // 2. 커스텀 운동인 경우 이름 변경 저장
-    if (isCustom && customName.trim() !== '' && customName !== exercise.name) {
+    const finalSettings = { ...settings };
+    if (!isCustom) {
+      if (customName.trim() !== exercise.name) {
+        finalSettings.customName = customName.trim();
+      } else {
+        finalSettings.customName = undefined;
+      }
+    }
+
+    // 1. 설정 저장 (이미지, 표시 여부 등)
+    SettingsRepository.saveExerciseSetting(finalSettings);
+
+    // 2. 카테고리 변경 저장
+    if (selectedCatId !== exercise.category) {
+      SettingsRepository.saveExerciseCategoryOverride(exercise.id, selectedCatId);
+      if (onCategoryChanged) onCategoryChanged();
+    }
+
+    // 3. 커스텀 운동인 경우 이름 변경 저장
+    if (isCustom && customName.trim() !== exercise.name) {
       const updated: CustomExercise = {
         ...exercise,
         name: customName.trim(),
         isCustom: true
       };
+      if (selectedCatId !== exercise.category) {
+        updated.category = selectedCatId as any;
+      }
       WorkoutRepository.saveCustomExercise(updated);
     }
 
@@ -91,7 +118,8 @@ const ExerciseEditModal: React.FC<ExerciseEditModalProps> = ({
   };
 
   return (
-    <motion.div
+    <>
+      <motion.div
       className="modal-overlay"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -140,18 +168,26 @@ const ExerciseEditModal: React.FC<ExerciseEditModalProps> = ({
           )}
         </div>
 
-        {/* Name (custom only) */}
-        {isCustom && (
-          <div className="eem-field">
-            <label className="eem-label">운동 이름</label>
-            <input
-              className="eem-input"
-              value={customName}
-              onChange={e => setCustomName(e.target.value)}
-              placeholder="운동 이름 입력"
-            />
-          </div>
-        )}
+        {/* Category Dropdown */}
+        <div className="eem-field">
+          <label className="eem-label">소속 부위 변경</label>
+          <CustomSelect
+            value={selectedCatId}
+            onChange={setSelectedCatId}
+            options={categories.map(c => ({ value: c.id, label: c.name }))}
+          />
+        </div>
+
+        {/* Name */}
+        <div className="eem-field">
+          <label className="eem-label">운동 이름</label>
+          <input
+            className="eem-input"
+            value={customName}
+            onChange={e => setCustomName(e.target.value)}
+            placeholder="운동 이름 입력"
+          />
+        </div>
 
         {/* Show Name Toggle */}
         <div className="eem-toggle-row" onClick={() => setSettings(prev => ({ ...prev, showName: !prev.showName }))}>
@@ -165,28 +201,36 @@ const ExerciseEditModal: React.FC<ExerciseEditModalProps> = ({
         </div>
 
         {/* Save Button */}
-        <button className="eem-save-btn" onClick={handleSave} disabled={isLoading}>
+        <button 
+          className="eem-save-btn" 
+          onClick={handleSave} 
+          disabled={isLoading || !customName.trim()}
+          style={{ opacity: !customName.trim() ? 0.5 : 1 }}
+        >
           저장하기
         </button>
 
         {/* Delete (custom only) */}
         {isCustom && (
-          confirmDelete ? (
-            <div className="eem-confirm-delete">
-              <span>정말 삭제하시겠습니까?</span>
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button className="eem-cancel-del" onClick={() => setConfirmDelete(false)}>취소</button>
-                <button className="eem-confirm-del" onClick={handleDelete}>삭제</button>
-              </div>
-            </div>
-          ) : (
-            <button className="eem-delete-btn" onClick={() => setConfirmDelete(true)}>
-              <Trash2 size={16} />
-              <span>이 운동 삭제</span>
-            </button>
-          )
+          <button className="eem-delete-btn" onClick={() => setConfirmDelete(true)}>
+            <Trash2 size={16} />
+            <span>이 운동 삭제</span>
+          </button>
         )}
       </motion.div>
+      </motion.div>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {confirmDelete && (
+          <ConfirmDeleteModal
+            title="운동 삭제"
+            message="정말 이 운동을 삭제하시겠습니까?"
+            onCancel={() => setConfirmDelete(false)}
+            onConfirm={handleDelete}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Image Picker Action Sheet */}
       <AnimatePresence>
@@ -223,219 +267,7 @@ const ExerciseEditModal: React.FC<ExerciseEditModalProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
-
-      <style>{`
-        .exercise-edit-modal {
-          background: var(--card-bg);
-          border: 1px solid var(--border-color);
-          border-radius: 24px;
-          padding: 20px;
-          width: 88%;
-          max-width: 340px;
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-          max-height: 90vh;
-          overflow-y: auto;
-        }
-        .eem-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .eem-title { font-size: 1rem; font-weight: 700; }
-        .eem-close {
-          padding: 6px;
-          background: var(--border-color);
-          border-radius: 8px;
-          color: var(--fg-color);
-        }
-        .eem-image-section {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 8px;
-        }
-        .eem-preview {
-          width: 120px;
-          height: 120px;
-          border-radius: 20px;
-          background: var(--border-color);
-          overflow: hidden;
-          position: relative;
-          cursor: pointer;
-          border: 1.5px dashed var(--muted-color);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .eem-preview-img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-        .eem-preview-placeholder {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 6px;
-          color: var(--muted-color);
-          font-size: 0.7rem;
-        }
-        .eem-preview-overlay {
-          position: absolute;
-          bottom: 6px;
-          right: 6px;
-          background: rgba(0,0,0,0.5);
-          border-radius: 50%;
-          padding: 4px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .eem-loading { font-size: 0.7rem; color: var(--muted-color); }
-        .eem-remove-img {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          font-size: 0.75rem;
-          color: #ff6b6b;
-        }
-        .eem-field { display: flex; flex-direction: column; gap: 6px; }
-        .eem-label { font-size: 0.7rem; color: var(--muted-color); }
-        .eem-input {
-          background: var(--border-color);
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 10px;
-          padding: 10px 12px;
-          color: var(--fg-color);
-          font-size: 0.9rem;
-          font-family: inherit;
-          outline: none;
-        }
-        .eem-input:focus { border-color: var(--accent-color); }
-        .eem-toggle-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 12px 14px;
-          background: rgba(255,255,255,0.04);
-          border-radius: 12px;
-          cursor: pointer;
-          border: 1px solid var(--border-color);
-        }
-        .eem-toggle-info { display: flex; flex-direction: column; gap: 2px; }
-        .eem-toggle-title { font-size: 0.85rem; font-weight: 600; }
-        .eem-toggle-desc { font-size: 0.65rem; color: var(--muted-color); }
-        .eem-toggle-icon { padding: 6px; border-radius: 8px; }
-        .eem-toggle-icon.on { color: var(--accent-color); }
-        .eem-toggle-icon.off { color: var(--muted-color); }
-        .eem-save-btn {
-          background: var(--fg-color);
-          color: var(--bg-color);
-          padding: 14px;
-          border-radius: 14px;
-          font-weight: 800;
-          font-size: 0.95rem;
-        }
-        .eem-save-btn:disabled { opacity: 0.5; }
-        .eem-delete-btn {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          padding: 12px;
-          border-radius: 12px;
-          background: rgba(255, 107, 107, 0.1);
-          color: #ff6b6b;
-          font-size: 0.85rem;
-          font-weight: 600;
-          border: 1px solid rgba(255,107,107,0.2);
-        }
-        .eem-confirm-delete {
-          text-align: center;
-          font-size: 0.85rem;
-          color: var(--muted-color);
-        }
-        .eem-cancel-del {
-          flex: 1;
-          padding: 10px;
-          border-radius: 10px;
-          background: var(--border-color);
-          color: var(--fg-color);
-          font-weight: 600;
-        }
-        .eem-confirm-del {
-          flex: 1;
-          padding: 10px;
-          border-radius: 10px;
-          background: #ff4444;
-          color: white;
-          font-weight: 700;
-        }
-        .eem-action-sheet-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0,0,0,0.5);
-          z-index: 1000;
-          display: flex;
-          align-items: flex-end;
-          justify-content: center;
-        }
-        .eem-action-sheet {
-          background: var(--card-bg);
-          border-radius: 20px 20px 0 0;
-          padding: 16px 20px 28px;
-          width: 100%;
-          max-width: 400px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-        .eem-action-sheet-handle {
-          width: 36px;
-          height: 4px;
-          background: var(--muted-color);
-          border-radius: 2px;
-          margin: 0 auto 4px;
-          opacity: 0.4;
-        }
-        .eem-action-sheet-title {
-          font-size: 0.85rem;
-          font-weight: 700;
-          color: var(--fg-color);
-          text-align: center;
-          margin-bottom: 4px;
-        }
-        .eem-action-btn {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 14px 16px;
-          border-radius: 14px;
-          background: rgba(255,255,255,0.06);
-          border: 1px solid var(--border-color);
-          color: var(--fg-color);
-          font-size: 0.95rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: background 0.15s;
-        }
-        .eem-action-btn:active {
-          background: rgba(255,255,255,0.12);
-        }
-        .eem-action-cancel {
-          padding: 12px;
-          border-radius: 14px;
-          background: var(--border-color);
-          color: var(--muted-color);
-          font-size: 0.9rem;
-          font-weight: 600;
-          margin-top: 4px;
-          cursor: pointer;
-        }
-      `}</style>
-    </motion.div>
+    </>
   );
 };
 
