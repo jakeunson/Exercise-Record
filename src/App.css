@@ -190,7 +190,7 @@
 .save-toast-wrapper { position: fixed; inset: 0; display: flex; justify-content: center; align-items: center; pointer-events: none; z-index: 2000; }
 .save-toast { background: var(--accent-color); color: #000; padding: 16px 32px; border-radius: 50px; display: flex; align-items: center; gap: 12px; font-size: 1.2rem; font-weight: 900; box-shadow: 0 10px 40px rgba(0, 230, 118, 0.6); backdrop-filter: blur(8px); border: 2px solid rgba(255, 255, 255, 0.3); }
 
-/* Feature 1: Rest Timer Modal Full (Below Top Bar) */
+/* ══ Rest Timer Modal — Option A (Full-screen ring, vertical layout) ══ */
 .rest-timer-modal-full {
   position: absolute;
   top: 90px;
@@ -198,79 +198,119 @@
   right: 12px;
   bottom: 16px;
   z-index: 50;
-  background: rgba(18, 18, 22, 0.98);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(14, 14, 18, 0.99);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--border-color);
-  border-radius: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 20px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
-}
-
-.rest-timer-content-box {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.timer-ring-wrap-large {
-  position: relative;
-  width: 94px;
-  height: 94px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.timer-count-large {
-  position: absolute;
-  font-size: 1.8rem;
-  font-weight: 900;
-  color: var(--accent-color);
-  letter-spacing: -0.5px;
-}
-
-.timer-info-large {
-  flex: 1;
+  border-radius: 28px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8),
+              0 0 0 1px rgba(255,255,255,0.04) inset;
 }
 
-.timer-label-large {
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: var(--fg-color);
-}
-
-.timer-sub-large {
-  font-size: 0.8rem;
-  color: var(--muted-color);
-}
-
-.timer-skip-btn-large {
-  padding: 12px 20px;
-  background: var(--border-color);
-  color: var(--fg-color);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  font-size: 0.9rem;
-  font-weight: 700;
+/* Ring wrapper — centers SVG and overlays text */
+.rt-ring-wrap {
+  position: relative;
+  width: min(200px, 55vw);
+  height: min(200px, 55vw);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  cursor: pointer;
-  transition: transform 0.15s, background 0.15s;
 }
 
-.timer-skip-btn-large:active {
-  background: rgba(255, 255, 255, 0.15);
-  transform: scale(0.95);
+.rt-ring-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  /* Subtle glow on the accent stroke */
+  filter: drop-shadow(0 0 8px rgba(var(--accent-rgb), 0.35));
 }
+
+/* Text stack centered inside the ring */
+.rt-center-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  pointer-events: none;
+}
+
+.rt-label {
+  font-size: clamp(0.65rem, 3.5vw, 0.8rem);
+  font-weight: 600;
+  color: var(--muted-color);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rt-count {
+  font-size: clamp(2.6rem, 14vw, 3.6rem);
+  font-weight: 900;
+  color: var(--accent-color);
+  letter-spacing: -2px;
+  line-height: 1;
+}
+
+.rt-unit {
+  font-size: clamp(0.7rem, 3.5vw, 0.85rem);
+  font-weight: 600;
+  color: var(--muted-color);
+  margin-top: 2px;
+}
+
+/* Bottom action buttons */
+.rt-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.rt-add-btn {
+  flex: 1;
+  padding: clamp(10px, 3vw, 14px) 0;
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-color);
+  border: 1.5px solid rgba(var(--accent-rgb), 0.4);
+  border-radius: 16px;
+  font-size: clamp(0.85rem, 4vw, 1rem);
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.12s, background 0.15s;
+}
+
+.rt-add-btn:active {
+  transform: scale(0.94);
+  background: rgba(var(--accent-rgb), 0.22);
+}
+
+.rt-skip-btn {
+  flex: 1;
+  padding: clamp(10px, 3vw, 14px) 0;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary, #aaa);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  font-size: clamp(0.85rem, 4vw, 1rem);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s, background 0.15s;
+}
+
+.rt-skip-btn:active {
+  transform: scale(0.94);
+  background: rgba(255, 255, 255, 0.12);
+}
+
 
 /* Feature 4: Theme */
 .theme-palettes { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
@@ -419,8 +459,25 @@
     min-width: 36px;
     height: 36px;
   }
+  /* 정사각형(플립 커버) 화면: top 조정 + 링/버튼 최적화 */
   .rest-timer-modal-full {
-    top: 66px;
+    top: 56px;
+    gap: 12px;
+    padding: 12px 12px;
+    border-radius: 20px;
+  }
+  .rt-ring-wrap {
+    width: min(160px, 52vw);
+    height: min(160px, 52vw);
+  }
+  .rt-actions {
+    gap: 8px;
+    max-width: 240px;
+  }
+  .rt-add-btn,
+  .rt-skip-btn {
+    border-radius: 12px;
+    font-size: 0.85rem;
   }
 }
 
