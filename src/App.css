@@ -195,8 +195,37 @@
   padding-bottom: 20px;
 }
 
-.save-toast-wrapper { position: fixed; inset: 0; display: flex; justify-content: center; align-items: center; pointer-events: none; z-index: 2000; }
-.save-toast { background: var(--accent-color); color: #000; padding: 16px 32px; border-radius: 50px; display: flex; align-items: center; gap: 12px; font-size: 1.2rem; font-weight: 900; box-shadow: 0 10px 40px rgba(0, 230, 118, 0.6); backdrop-filter: blur(8px); border: 2px solid rgba(255, 255, 255, 0.3); }
+.global-toast-container {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.global-toast {
+  background: rgba(22, 22, 26, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #ffffff;
+  padding: 10px 20px;
+  border-radius: 50px;
+  border: 1px solid var(--accent-color);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 12px rgba(var(--accent-rgb, 0, 230, 118), 0.25);
+  font-size: clamp(0.8rem, 3.5vw, 0.9rem);
+  font-weight: 700;
+  white-space: nowrap;
+  text-align: center;
+  max-width: 90vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
 
 /* ══ Rest Timer Modal — Option A (Full-screen ring, vertical layout) ══ */
 .rest-timer-modal-full {

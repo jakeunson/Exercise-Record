@@ -456,35 +456,20 @@ const App: React.FC = () => {
         )}
       </AnimatePresence>
 
+      {/* ══════════════════ GLOBAL TOAST ══════════════════ */}
       <AnimatePresence>
         {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            style={{
-              position: 'fixed',
-              bottom: '30px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              background: 'rgba(24, 24, 28, 0.96)',
-              backdropFilter: 'blur(8px)',
-              color: '#fff',
-              padding: '10px 18px',
-              borderRadius: '20px',
-              border: '1px solid var(--accent-color)',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              zIndex: 9999,
-              pointerEvents: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <span>{toastMessage}</span>
-          </motion.div>
+          <div className="global-toast-container">
+            <motion.div
+              className="global-toast"
+              initial={{ opacity: 0, y: 16, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+            >
+              <span>{toastMessage}</span>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
