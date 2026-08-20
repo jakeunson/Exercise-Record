@@ -8,6 +8,7 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { ExportService } from './core/services/exportService';
 import { WorkoutService } from './core/services/workoutService';
+import { ThemeService } from './core/services/themeService';
 
 import { useStorageInit } from './ui/hooks/useStorageInit';
 import { useSettings } from './ui/hooks/useSettings';
@@ -139,6 +140,12 @@ const App: React.FC = () => {
       setFilterMonth(new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).substring(0, 7));
     }
   }, [filterMonth]);
+
+  useEffect(() => {
+    if (isLoaded && settings.accentColor) {
+      ThemeService.applyTheme(settings.accentColor);
+    }
+  }, [settings.accentColor, isLoaded]);
 
   useEffect(() => {
     if (!isLoaded) return;

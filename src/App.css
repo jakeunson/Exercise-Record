@@ -270,45 +270,54 @@
 /* Bottom action buttons */
 .rt-actions {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
   max-width: 280px;
 }
 
 .rt-add-btn {
   flex: 1;
-  padding: clamp(10px, 3vw, 14px) 0;
-  background: rgba(var(--accent-rgb), 0.12);
+  padding: clamp(12px, 3.5vw, 15px) 0;
+  background: rgba(var(--accent-rgb, 0, 230, 118), 0.16);
   color: var(--accent-color);
-  border: 1.5px solid rgba(var(--accent-rgb), 0.4);
+  border: 1.5px solid var(--accent-color);
   border-radius: 16px;
-  font-size: clamp(0.85rem, 4vw, 1rem);
+  font-size: clamp(0.9rem, 4vw, 1.05rem);
   font-weight: 800;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   transition: transform 0.12s, background 0.15s;
 }
 
 .rt-add-btn:active {
   transform: scale(0.94);
-  background: rgba(var(--accent-rgb), 0.22);
+  background: var(--accent-color);
+  color: #000;
 }
 
 .rt-skip-btn {
   flex: 1;
-  padding: clamp(10px, 3vw, 14px) 0;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-secondary, #aaa);
-  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  padding: clamp(12px, 3.5vw, 15px) 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--fg-color);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
   border-radius: 16px;
-  font-size: clamp(0.85rem, 4vw, 1rem);
+  font-size: clamp(0.9rem, 4vw, 1.05rem);
   font-weight: 700;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   transition: transform 0.12s, background 0.15s;
 }
 
 .rt-skip-btn:active {
   transform: scale(0.94);
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.16);
 }
 
 
@@ -646,7 +655,7 @@
 
 .col-set { width: 36px; flex-shrink: 0; text-align: center; font-weight: 700; color: var(--muted-color); }
 .col-val { flex: 1; text-align: center; }
-.col-check { width: 76px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.col-check { width: 82px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 6px; }
 
 .set-row-item {
   display: flex;
@@ -718,6 +727,7 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  flex-shrink: 0;
 }
 
 .check-btn.checked {
@@ -728,16 +738,16 @@
 }
 
 .inline-del-btn {
-  width: 30px;
+  width: 36px;
   height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(255, 68, 68, 0.12);
   color: #ff5555;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
-  border: 1px solid rgba(255, 68, 68, 0.25);
+  border: 1px solid rgba(255, 68, 68, 0.3);
   transition: all 0.15s;
   flex-shrink: 0;
 }

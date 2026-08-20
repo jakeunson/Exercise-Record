@@ -7,6 +7,7 @@
   --bg-color: #000000;
   --fg-color: #ffffff;
   --accent-color: #00E676; /* Spring Green for progress */
+  --accent-rgb: 0, 230, 118;
   --muted-color: #888888;
   --border-color: #222222;
   --card-bg: #111111;

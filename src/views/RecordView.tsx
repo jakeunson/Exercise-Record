@@ -457,7 +457,7 @@ const RecordView: React.FC<RecordViewProps> = ({
                     }}
                     title="세트 삭제"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={18} strokeWidth={2.2} />
                   </button>
                 )}
               </div>
