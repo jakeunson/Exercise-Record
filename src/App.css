@@ -76,7 +76,15 @@
   font-weight: 800;
 }
 
-.home-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; }
+.home-header { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  padding: 20px 0; 
+  position: relative;
+  z-index: 1001;
+  background: var(--bg-color);
+}
 .header-actions { display: flex; gap: 8px; }
 .icon-trigger { 
   padding: 10px; background: var(--card-bg); border-radius: 12px; 
@@ -141,7 +149,7 @@
 .add-ex-input:focus { border-color: var(--accent-color); }
 
 .record-header { 
-  position: sticky; top: 0; background: var(--bg-color); z-index: 60;
+  position: sticky; top: 0; background: var(--bg-color); z-index: 1001;
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   min-height: 40px;
   padding: 20px 0;
@@ -193,24 +201,20 @@
 /* ══ Rest Timer Modal — Option A (Full-screen ring, vertical layout) ══ */
 .rest-timer-modal-full {
   position: absolute;
-  top: 90px;
-  left: 12px;
-  right: 12px;
-  bottom: 16px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 50;
-  background: rgba(14, 14, 18, 0.99);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--border-color);
-  border-radius: 28px;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 20px;
-  padding: 20px 16px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8),
-              0 0 0 1px rgba(255,255,255,0.04) inset;
+  padding: 60px 16px 20px;
 }
 
 /* Ring wrapper — centers SVG and overlays text */
@@ -405,7 +409,17 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
-.modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); }
+.modal-overlay { 
+  position: fixed; 
+  inset: 0; 
+  background: rgba(0, 0, 0, 0.78); 
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
+  z-index: 1000; 
+  backdrop-filter: blur(16px); 
+  -webkit-backdrop-filter: blur(16px); 
+}
 .confirm-modal { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 20px; padding: 20px; width: 85%; max-width: 300px; text-align: center; display: flex; flex-direction: column; gap: 12px; }
 .exit-modal {
   background: var(--card-bg);
@@ -468,12 +482,10 @@
     min-width: 36px;
     height: 36px;
   }
-  /* 정사각형(플립 커버) 화면: top 조정 + 링/버튼 최적화 */
+  /* 정사각형(플립 커버) 화면: 링/버튼 최적화 */
   .rest-timer-modal-full {
-    top: 56px;
-    gap: 12px;
-    padding: 12px 12px;
-    border-radius: 20px;
+    padding: 46px 12px 10px;
+    gap: 10px;
   }
   .rt-ring-wrap {
     width: min(160px, 52vw);

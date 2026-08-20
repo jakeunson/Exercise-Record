@@ -99,6 +99,7 @@ button {
   flex-direction: column;
   padding: 0 20px 20px;
   gap: 0;
+  position: relative;
 }
 
 /* Z Flip Cover Screen specific adjustments */
