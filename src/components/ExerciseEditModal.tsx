@@ -4,7 +4,8 @@ import { Camera as CameraIcon, Image as ImageIcon, Trash2, Eye, EyeOff, X } from
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import type { Exercise, ExerciseSettings } from '../types';
 import type { CustomExercise } from '../types';
-import { StorageService } from '../services/storage';
+import { WorkoutRepository } from '../core/repositories/workoutRepository';
+import { SettingsRepository } from '../core/repositories/settingsRepository';
 
 interface ExerciseEditModalProps {
   exercise: Exercise;
@@ -23,7 +24,7 @@ const ExerciseEditModal: React.FC<ExerciseEditModalProps> = ({
   const isCustom = (exercise as CustomExercise).isCustom === true;
 
   const [settings, setSettings] = useState<ExerciseSettings>(() =>
-    StorageService.getExerciseSetting(exercise.id)
+    SettingsRepository.getExerciseSetting(exercise.id)
   );
   const [customName, setCustomName] = useState(exercise.name);
   const [previewImage, setPreviewImage] = useState<string | undefined>(settings.customImage);
@@ -65,20 +66,27 @@ const ExerciseEditModal: React.FC<ExerciseEditModalProps> = ({
   };
 
   const handleSave = () => {
-    StorageService.saveExerciseSetting(settings);
-    // If custom exercise, also update name
-    if (isCustom && customName !== exercise.name) {
-      const updated: CustomExercise = { ...(exercise as CustomExercise), name: customName };
-      StorageService.saveCustomExercise(updated);
+    // 1. 설정 저장 (이미지, 표시 여부 등)
+    SettingsRepository.saveExerciseSetting(settings);
+
+    // 2. 커스텀 운동인 경우 이름 변경 저장
+    if (isCustom && customName.trim() !== '' && customName !== exercise.name) {
+      const updated: CustomExercise = {
+        ...exercise,
+        name: customName.trim(),
+        isCustom: true
+      };
+      WorkoutRepository.saveCustomExercise(updated);
     }
+
     onSaved();
     onClose();
   };
 
   const handleDelete = () => {
     if (!isCustom) return;
-    StorageService.deleteCustomExercise(exercise.id);
-    onDeleted?.();
+    WorkoutRepository.deleteCustomExercise(exercise.id);
+    if (onDeleted) onDeleted();
     onClose();
   };
 

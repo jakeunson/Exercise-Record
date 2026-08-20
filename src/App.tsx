@@ -1,19 +1,18 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { AnimatePresence, motion } from 'framer-motion';
-import { DEFAULT_EXERCISES } from './types';
-import type { Category, WorkoutSession, SetRecord, SubSet, Exercise } from './types';
-import type { CustomExercise, ExerciseSettings } from './types';
+import { DEFAULT_EXERCISES } from './core/data/exercises';
+import type { Category, WorkoutSession, SetRecord, SubSet, Exercise, CustomExercise, ExerciseSettings } from './core/types';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
-import { StorageService } from './services/storage';
+import { ExportService } from './core/services/exportService';
+import { WorkoutService } from './core/services/workoutService';
 
-import { useStorage } from './hooks/useStorage';
-import { useSettingsState } from './hooks/useSettingsState';
-import { useWorkoutState } from './hooks/useWorkoutState';
-import { useHistoryState } from './hooks/useHistoryState';
-import { useInBodyState } from './hooks/useInBodyState';
+import { useStorageInit } from './ui/hooks/useStorageInit';
+import { useSettings } from './ui/hooks/useSettings';
+import { useWorkout } from './ui/hooks/useWorkout';
+import { useInBody } from './ui/hooks/useInBody';
 
 import ExerciseEditModal from './components/ExerciseEditModal';
 import CategoryView from './views/CategoryView';
@@ -31,24 +30,20 @@ import './App.css';
 type Step = 'category' | 'select' | 'record' | 'summary' | 'history' | 'inbody' | 'inbody_list' | 'settings';
 
 const App: React.FC = () => {
-  const { isLoaded, error } = useStorage();
+  const { isLoaded, error } = useStorageInit();
 
-  // Internal Step/Navigation State
   const [step, setStep] = useState<Step>('category');
   const [showExitModal, setShowExitModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
 
-  // Form States
   const [currentSets, setCurrentSets] = useState<SetRecord[]>([]);
   const [tempSubSets, setTempSubSets] = useState<SubSet[]>([]);
 
-  // InBody Input States
   const [ibWeight, setIbWeight] = useState(70);
   const [ibMuscle, setIbMuscle] = useState(30);
   const [ibFat, setIbFat] = useState(20);
 
-  // Feedback/UI States
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [deletingSession, setDeletingSession] = useState<{id: string, date: string} | null>(null);
@@ -62,7 +57,6 @@ const App: React.FC = () => {
     setTimeout(() => setToastMessage(null), 2200);
   }, []);
   
-  // Timer States
   const [timerActive, setTimerActive] = useState(false);
   const [timerKey, setTimerKey] = useState(0);
 
@@ -70,13 +64,10 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // --- Hooks Initialization (Conditional on isLoaded) ---
-  const settingsState = useSettingsState();
-  const workoutState = useWorkoutState();
-  const historyState = useHistoryState();
-  const inBodyState = useInBodyState();
+  const settings = useSettings();
+  const workout = useWorkout();
+  const inBody = useInBody();
 
-  // Handle Android Back Button
   useEffect(() => {
     const handleBackButton = () => {
       if (showExitModal) {
@@ -85,7 +76,7 @@ const App: React.FC = () => {
       }
       if (step === 'category') {
         setShowExitModal(true);
-      } else if (step === 'record' || step === 'history' || step === 'settings' || step === 'summary' || step === 'select' || step === 'inbody' || step === 'inbody_list') {
+      } else if (['record', 'history', 'settings', 'summary', 'select', 'inbody', 'inbody_list'].includes(step)) {
         if (step === 'record') {
           if (currentSets.length > 0) showToast('운동이 임시 저장되었습니다 💾');
           setStep('select');
@@ -103,12 +94,11 @@ const App: React.FC = () => {
     return () => {
       listener.then(l => l.remove());
     };
-  }, [step, showExitModal]);
+  }, [step, showExitModal, currentSets.length, showToast]);
 
-  // 00시(자정) 경과 시 임시 저장된 운동 자동 정리
   useEffect(() => {
     const handleVisibilityOrResume = () => {
-      workoutState.reloadOngoingWorkouts();
+      workout.reload();
     };
 
     document.addEventListener('visibilitychange', handleVisibilityOrResume);
@@ -120,12 +110,11 @@ const App: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibilityOrResume);
       stateListener.then(l => l.remove());
     };
-  }, [workoutState]);
+  }, [workout]);
 
-  // Synchronize currentSets and tempSubSets back to ongoingWorkouts while recording
   useEffect(() => {
     if (selectedExercise && step === 'record' && isLoaded) {
-      const currentOngoing = workoutState.ongoingWorkouts;
+      const currentOngoing = workout.ongoingWorkouts;
       const existing = currentOngoing[selectedExercise.id];
       if (currentSets.length === 0 && tempSubSets.length === 0 && !existing) {
         return;
@@ -133,7 +122,7 @@ const App: React.FC = () => {
       if (existing && existing.sets === currentSets && existing.tempSubSets === tempSubSets) {
         return;
       }
-      workoutState.updateOngoingWorkouts({
+      workout.updateOngoingWorkouts({
         ...currentOngoing,
         [selectedExercise.id]: {
           sets: currentSets,
@@ -141,9 +130,8 @@ const App: React.FC = () => {
         }
       });
     }
-  }, [currentSets, tempSubSets, selectedExercise, step, isLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentSets, tempSubSets, selectedExercise, step, isLoaded]);
 
-  // History Filter
   const [filterMonth, setFilterMonth] = useState(() => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).substring(0, 7));
 
   useEffect(() => {
@@ -152,47 +140,23 @@ const App: React.FC = () => {
     }
   }, [filterMonth]);
 
-  // Refresh Views when navigating
   useEffect(() => {
     if (!isLoaded) return;
-    if (step === 'history') historyState.reloadHistory();
-    if (step === 'inbody_list') inBodyState.reloadInBody();
-    if (step === 'category') historyState.reloadHistory(); // Refresh workoutDates
-  }, [step, isLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (step === 'history') workout.reload();
+    if (step === 'inbody_list') inBody.reload();
+    if (step === 'category') workout.reload(); 
+  }, [step, isLoaded]); 
 
-  // Theme
-  const hexToRgb = (hex: string) => {
-    let c = hex.substring(1);      // strip #
-    if(c.length === 3) c = c[0]+c[0]+c[1]+c[1]+c[2]+c[2];
-    const rgb = parseInt(c, 16);
-    return `${(rgb >> 16) & 255}, ${(rgb >> 8) & 255}, ${rgb & 255}`;
-  };
-
-  useEffect(() => {
-    if (isLoaded) {
-      document.documentElement.style.setProperty('--accent-color', settingsState.accentColor);
-      document.documentElement.style.setProperty('--accent-rgb', hexToRgb(settingsState.accentColor));
-    }
-  }, [settingsState.accentColor, isLoaded]);
-
-  const applyTheme = (color: string) => {
-    settingsState.updateAccentColor(color);
-    document.documentElement.style.setProperty('--accent-color', color);
-    document.documentElement.style.setProperty('--accent-rgb', hexToRgb(color));
-  };
-
-  // Timer
   const startTimer = useCallback(() => {
-    if (settingsState.timerDuration === 0) return;
+    if (settings.timerDuration === 0) return;
     setTimerActive(true);
     setTimerKey(k => k + 1);
-  }, [settingsState.timerDuration]);
+  }, [settings.timerDuration]);
 
   const stopTimer = useCallback(() => {
     setTimerActive(false);
   }, []);
 
-  // Wake Lock
   const requestWakeLock = async () => {
     try {
       if ('wakeLock' in navigator) {
@@ -215,32 +179,31 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Memos
   const filteredHistory = useMemo(() => {
-    return historyState.historySessions
+    return workout.sessions
       .filter(s => !filterMonth || s.date.startsWith(filterMonth))
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [historyState.historySessions, filterMonth]);
+  }, [workout.sessions, filterMonth]);
 
   const allExercises = useMemo(() => {
-    return [...DEFAULT_EXERCISES, ...workoutState.customExercises] as Exercise[];
-  }, [workoutState.customExercises]);
+    return [...DEFAULT_EXERCISES, ...workout.customExercises] as Exercise[];
+  }, [workout.customExercises]);
 
   const activeCategories = useMemo(() => {
     const activeCats = new Set<Category>();
-    Object.entries(workoutState.ongoingWorkouts).forEach(([exId, state]) => {
+    Object.entries(workout.ongoingWorkouts).forEach(([exId, state]) => {
       if (state.sets.length > 0) {
         const ex = allExercises.find(e => e.id === exId);
         if (ex) activeCats.add(ex.category);
       }
     });
     return activeCats;
-  }, [workoutState.ongoingWorkouts, allExercises]);
+  }, [workout.ongoingWorkouts, allExercises]);
 
   const filteredExercises = useMemo(() => {
     if (!selectedCategory) return [];
     const base = allExercises.filter(ex => ex.category === selectedCategory);
-    const usedIds = new Set(historyState.historySessions.map(s => s.exerciseId));
+    const usedIds = new Set(workout.sessions.map(s => s.exerciseId));
     
     return [...base].sort((a, b) => {
       const aUsed = usedIds.has(a.id) ? 1 : 0;
@@ -248,11 +211,11 @@ const App: React.FC = () => {
       if (aUsed !== bUsed) return bUsed - aUsed;
       return a.name.localeCompare(b.name);
     });
-  }, [selectedCategory, allExercises, historyState.historySessions]);
+  }, [selectedCategory, allExercises, workout.sessions]);
 
   const getExSetting = useCallback((exerciseId: string): ExerciseSettings => {
-    return settingsState.exerciseSettings.find(s => s.exerciseId === exerciseId) ?? { exerciseId, showName: true };
-  }, [settingsState.exerciseSettings]);
+    return settings.exerciseSettings.find(s => s.exerciseId === exerciseId) ?? { exerciseId, showName: true };
+  }, [settings.exerciseSettings]);
 
   const selectCategory = (cat: Category) => {
     setSelectedCategory(cat);
@@ -262,12 +225,12 @@ const App: React.FC = () => {
   const [prevSession, setPrevSession] = useState<WorkoutSession | null>(null);
 
   const startWorkout = (exercise: Exercise) => {
-    const ongoing = workoutState.ongoingWorkouts[exercise.id];
+    const ongoing = workout.ongoingWorkouts[exercise.id];
     
     setSelectedExercise(exercise);
     setTimerActive(false);
     setStep('record');
-    setPrevSession(StorageService.getLatestSession(exercise.id));
+    setPrevSession(WorkoutService.getLatestSession(exercise.id));
     
     if (!ongoing) {
       setCurrentSets([]);
@@ -278,32 +241,19 @@ const App: React.FC = () => {
     }
   };
 
-  // addSubSet and saveSet removed
-
   const finishWorkout = (finalSetsFromView?: any) => {
     stopTimer();
-    // 이벤트 객체가 넘어오는 것을 방지하고 명확히 배열일 때만 사용
     const setsToSave = Array.isArray(finalSetsFromView) ? finalSetsFromView : currentSets;
     if (selectedExercise && setsToSave.length > 0) {
-      historyState.saveSession({
-        exerciseId: selectedExercise.id,
-        date: new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }),
-        sets: setsToSave,
-      });
+      workout.finishWorkout(selectedExercise, setsToSave, []);
       setCurrentSets(setsToSave);
-    }
-
-    if (selectedExercise) {
-      const copy = { ...workoutState.ongoingWorkouts };
-      delete copy[selectedExercise.id];
-      workoutState.updateOngoingWorkouts(copy);
     }
 
     setStep('summary');
   };
 
   const saveInBody = (dateStr: string, w: number, m: number, f: number) => {
-    inBodyState.saveInBody({
+    inBody.saveInBody({
       date: dateStr,
       weight: w,
       skeletalMuscleMass: m,
@@ -313,7 +263,7 @@ const App: React.FC = () => {
   };
 
   const handleExport = async () => {
-    const json = StorageService.exportData();
+    const json = ExportService.exportData();
     const fileName = `workout_backup_${new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })}.json`;
 
     if (Capacitor.isNativePlatform()) {
@@ -351,12 +301,13 @@ const App: React.FC = () => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (event) => {
-      const result = await StorageService.importData(event.target?.result as string);
+      const result = await ExportService.importData(event.target?.result as string);
       setImportStatus(result ? 'success' : 'error');
       if (result) {
         setTimeout(() => {
-          historyState.reloadHistory();
-          inBodyState.reloadInBody();
+          workout.reload();
+          inBody.reload();
+          settings.reload();
           setStep('category');
         }, 1500);
       }
@@ -372,7 +323,7 @@ const App: React.FC = () => {
     setTempSubSets([]);
     setImportStatus('idle');
     setTimerActive(false);
-    historyState.reloadHistory();
+    workout.reload();
   };
 
   const handleLongPressStart = (exercise: Exercise) => {
@@ -394,14 +345,11 @@ const App: React.FC = () => {
       category: selectedCategory,
       isCustom: true,
     };
-    workoutState.saveCustomExercise(newEx);
+    workout.saveCustomExercise(newEx);
     setNewExName('');
     setShowAddExercise(false);
   };
 
-  // SwipePicker Options removed (not used anymore)
-
-  // Loading Screen
   if (!isLoaded) {
     return (
       <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-primary)' }}>
@@ -420,18 +368,18 @@ const App: React.FC = () => {
             activeCategories={activeCategories}
             selectCategory={selectCategory}
             setStep={setStep}
-            historySessions={historyState.historySessions}
+            historySessions={workout.sessions}
             allExercises={allExercises}
           />
         )}
         {step === 'settings' && (
           <SettingsView
-            userProfile={settingsState.userProfile}
-            updateUserProfile={settingsState.updateUserProfile}
-            accentColor={settingsState.accentColor}
-            applyTheme={applyTheme}
-            timerDuration={settingsState.timerDuration}
-            setTimerDuration={settingsState.updateTimerDuration}
+            userProfile={settings.userProfile}
+            updateUserProfile={settings.updateUserProfile}
+            accentColor={settings.accentColor}
+            applyTheme={settings.updateAccentColor}
+            timerDuration={settings.timerDuration}
+            setTimerDuration={settings.updateTimerDuration}
             handleExport={handleExport}
             handleImport={handleImport}
             importStatus={importStatus}
@@ -441,9 +389,9 @@ const App: React.FC = () => {
         )}
         {step === 'inbody_list' && (
           <InBodyListView
-            userProfile={settingsState.userProfile}
-            inBodyHistory={inBodyState.inBodyHistory}
-            updateInBody={inBodyState.updateInBody}
+            userProfile={settings.userProfile}
+            inBodyHistory={inBody.inBodyHistory}
+            updateInBody={inBody.updateInBody}
             setDeletingInBody={setDeletingInBody}
             setStep={setStep}
           />
@@ -457,20 +405,20 @@ const App: React.FC = () => {
         )}
         {step === 'history' && (
           <HistoryView
-            historySessions={historyState.historySessions}
+            historySessions={workout.sessions}
             allExercises={allExercises}
             filterMonth={filterMonth} setFilterMonth={setFilterMonth}
             filteredHistory={filteredHistory}
             setDeletingSession={setDeletingSession}
             setStep={setStep}
-            updateSession={historyState.updateSession}
+            updateSession={workout.updateSession}
           />
         )}
         {step === 'select' && (
           <SelectExerciseView
             selectedCategory={selectedCategory}
             filteredExercises={filteredExercises}
-            ongoingWorkouts={workoutState.ongoingWorkouts}
+            ongoingWorkouts={workout.ongoingWorkouts}
             getExSetting={getExSetting}
             startWorkout={startWorkout}
             handleLongPressStart={handleLongPressStart}
@@ -486,7 +434,7 @@ const App: React.FC = () => {
             setCurrentSets={setCurrentSets}
             prevSession={prevSession}
             finishWorkout={finishWorkout}
-            timerActive={timerActive} timerKey={timerKey} timerDuration={settingsState.timerDuration} stopTimer={stopTimer}
+            timerActive={timerActive} timerKey={timerKey} timerDuration={settings.timerDuration} stopTimer={stopTimer}
             startTimer={startTimer}
             showToast={showToast}
             setStep={setStep}
@@ -501,7 +449,6 @@ const App: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* ══════════════════ GLOBAL TOAST ══════════════════ */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div
@@ -534,14 +481,13 @@ const App: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* ══════════════════ DELETE MODALS ══════════════════ */}
       <AnimatePresence>
         {(deletingSession || deletingInBody) && (
           <ConfirmDeleteModal
             onCancel={() => { setDeletingSession(null); setDeletingInBody(null); }}
             onConfirm={() => {
-              if (deletingSession) historyState.deleteSession(deletingSession.id, deletingSession.date);
-              if (deletingInBody) inBodyState.deleteInBody(deletingInBody);
+              if (deletingSession) workout.deleteSession(deletingSession.id, deletingSession.date);
+              if (deletingInBody) inBody.deleteInBody(deletingInBody);
               setDeletingSession(null);
               setDeletingInBody(null);
             }}
@@ -549,24 +495,20 @@ const App: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* ══════════════════ EXERCISE EDIT MODAL ══════════════════ */}
       <AnimatePresence>
         {editingExercise && (
           <ExerciseEditModal
             exercise={editingExercise}
             onClose={() => setEditingExercise(null)}
-            onSaved={settingsState.reloadSettings}
+            onSaved={settings.reload}
             onDeleted={() => {
-              workoutState.reloadCustomExercises();
-              settingsState.reloadSettings();
+              workout.reload();
+              settings.reload();
             }}
           />
         )}
       </AnimatePresence>
 
-
-
-      {/* ══════════════════ ADD CUSTOM EXERCISE MODAL ══════════════════ */}
       <AnimatePresence>
         {showAddExercise && (
           <AddCustomExerciseModal
