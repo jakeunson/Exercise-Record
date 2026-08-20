@@ -183,12 +183,16 @@ const RecordView: React.FC<RecordViewProps> = ({
         target.subSets[sIdx][focusedCell.field] = Math.round(updated * 10) / 10;
       } else {
         const current = target[focusedCell.field];
-        const updated = Math.max(0, (current || 0) + delta);
-        target[focusedCell.field] = Math.round(updated * 10) / 10;
+        const raw = Math.max(0, (current || 0) + delta);
+        // distance는 소수점 1자리, 나머지(time, calories)는 정수
+        target[focusedCell.field] = focusedCell.field === 'distance'
+          ? Math.round(raw * 10) / 10
+          : Math.round(raw);
       }
       return copy;
     });
   };
+
 
   const removeSet = (index: number) => {
     setWorkingSets(prev => {
@@ -265,8 +269,8 @@ const RecordView: React.FC<RecordViewProps> = ({
       return (
         <div className="quick-pad">
           <button onClick={() => updateFocusedValue(-1.0)}>-1.0</button>
-          <button onClick={() => updateFocusedValue(-0.5)}>-0.5</button>
-          <button onClick={() => updateFocusedValue(0.5)}>+0.5</button>
+          <button onClick={() => updateFocusedValue(-0.1)}>-0.1</button>
+          <button onClick={() => updateFocusedValue(0.1)}>+0.1</button>
           <button onClick={() => updateFocusedValue(1.0)}>+1.0</button>
         </div>
       );
@@ -282,10 +286,10 @@ const RecordView: React.FC<RecordViewProps> = ({
     } else if (field === 'calories') {
       return (
         <div className="quick-pad">
-          <button onClick={() => updateFocusedValue(-50)}>-50</button>
           <button onClick={() => updateFocusedValue(-10)}>-10</button>
+          <button onClick={() => updateFocusedValue(-1)}>-1</button>
+          <button onClick={() => updateFocusedValue(1)}>+1</button>
           <button onClick={() => updateFocusedValue(10)}>+10</button>
-          <button onClick={() => updateFocusedValue(50)}>+50</button>
         </div>
       );
     }
